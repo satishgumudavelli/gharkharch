@@ -37,11 +37,26 @@
   #err,#lerr{color:var(--red)}
   #brk{color:var(--mut);font-size:.9em;margin:8px 0;text-align:center}
   a{color:var(--mut)}
-  label{color:var(--mut);font-size:.9em}
+  input[type=checkbox]{width:22px;height:22px;min-height:0;padding:0;margin:0;flex:none;accent-color:var(--btn)}
+  label.chk{display:flex;align-items:center;gap:10px;padding:10px 4px;cursor:pointer}
+  .stats{display:flex;justify-content:center;gap:8px;margin:10px 0 4px}
+  .stats div{flex:1;background:var(--bg);border-radius:10px;padding:8px 4px;color:var(--mut);font-size:.85em}
+  .stats strong{display:block;color:var(--fg);font-size:1.15em}
+  form{background:var(--card);padding:12px;border-radius:14px}
+  input,select{width:100%;min-width:0}
+  @media(min-width:600px){body{max-width:620px}.card b{font-size:3em}}
+  #bar{position:fixed;top:0;left:0;height:4px;width:100%;background:linear-gradient(90deg,transparent,var(--btn),transparent);
+    background-size:40% 100%;background-repeat:no-repeat;animation:slide 1s linear infinite;opacity:0;transition:opacity .15s;z-index:9}
+  @keyframes slide{from{background-position:-40% 0}to{background-position:140% 0}}
+  body.busy #bar{opacity:1}
+  body.busy{cursor:progress}
+  body.busy #list,body.busy .card{opacity:.5;transition:opacity .15s}
+  body.busy button{pointer-events:none}
   [hidden]{display:none!important}
 </style>
 </head>
 <body>
+<div id="bar"></div>
 <form id="login" hidden>
   <input class="full" type="password" id="pin" placeholder="PIN / password" required autocomplete="current-password">
   <button class="full">Unlock</button>
@@ -49,14 +64,21 @@
 </form>
 
 <div id="app" hidden>
-  <input type="month" id="month" style="width:100%;margin-bottom:8px">
+  <div style="display:flex;gap:8px;margin-bottom:8px">
+    <button id="prev" aria-label="Previous month" style="width:52px;flex:none">◀</button>
+    <input type="month" id="month" style="flex:1;text-align:center">
+    <button id="next" aria-label="Next month" style="width:52px;flex:none">▶</button>
+  </div>
   <div id="warn" hidden></div>
   <div class="card">Remaining<b id="bal">₹0</b>
-    <small>Income ₹<span id="inc">0</span> · Expense ₹<span id="exp">0</span></small>
-    <small id="carry"></small>
+    <div class="stats">
+      <div>Income<strong>₹<span id="inc">0</span></strong></div>
+      <div>Expense<strong>₹<span id="exp">0</span></strong></div>
+      <div id="carrybox" hidden>Carried<strong>₹<span id="carryv">0</span></strong></div>
+    </div>
     <small id="pace"></small>
   </div>
-  <label><input type="checkbox" id="cf"> Carry leftover from earlier months</label>
+  <label class="chk"><input type="checkbox" id="cf"> Carry leftover from earlier months</label>
 
   <form id="f">
     <input type="date" id="date" required>
@@ -84,6 +106,11 @@ const LOW   = 200;                       // warn when remaining drops below this
 
 const $ = id => document.getElementById(id);
 const sum = rows => rows.reduce((a, r) => a + (r.type === "income" ? +r.amount : -r.amount), 0);
+let busyN = 0; // loader: top bar + dimmed card/list + buttons locked while a user action is running
+const spin = async f => {
+  document.body.classList.add("busy"); busyN++;
+  try { return await f(); } finally { if (!--busyN) document.body.classList.remove("busy"); }
+};
 let S = null, rows = [], editId = null, cat = localStorage.cat || CATS[0];
 try { S = JSON.parse(localStorage.gk); } catch (e) {}
 
@@ -107,7 +134,7 @@ const logout = () => { S = null; delete localStorage.gk; show(false); };
 $("lock").onclick = e => { e.preventDefault(); logout(); };
 $("login").onsubmit = async e => {
   e.preventDefault();
-  try { await auth("password", {email: EMAIL, password: $("pin").value}); $("pin").value = ""; $("lerr").textContent = ""; show(true); load(); }
+  try { await spin(() => auth("password", {email: EMAIL, password: $("pin").value})); $("pin").value = ""; $("lerr").textContent = ""; show(true); spin(load); }
   catch (e) { $("lerr").textContent = "Wrong PIN"; }
 };
 
@@ -126,9 +153,15 @@ $("who").onchange = () => localStorage.who = $("who").value;
 const today = new Date().toLocaleDateString("sv"); // local date (toISOString is UTC: wrong in IST)
 $("date").value = today;
 $("month").value = today.slice(0, 7);
-$("month").onchange = () => $("month").value && load();
+$("month").onchange = () => $("month").value && spin(load);
+const shift = n => { // move month by n (Date handles year rollover)
+  const [y, m] = $("month").value.split("-").map(Number), d = new Date(y, m - 1 + n, 1);
+  $("month").value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; spin(load);
+};
+$("prev").onclick = () => shift(-1);
+$("next").onclick = () => shift(1);
 $("cf").checked = localStorage.cf === "1";
-$("cf").onchange = () => { localStorage.cf = $("cf").checked ? "1" : "0"; load(); };
+$("cf").onchange = () => { localStorage.cf = $("cf").checked ? "1" : "0"; spin(load); };
 
 function drawCats() {
   $("cats").replaceChildren(...CATS.map(c => {
@@ -163,9 +196,11 @@ $("f").onsubmit = async e => {
   const body = JSON.stringify({date: $("date").value, type: $("type").value, amount: +$("amount").value,
     who: $("who").value, note: $("note").value.trim(), category: $("type").value === "expense" ? cat : null});
   try {
-    await (editId ? api("?id=eq." + editId, {method: "PATCH", headers: {Prefer: "return=minimal"}, body})
-                  : api("", {method: "POST", headers: {Prefer: "return=minimal"}, body}));
-    resetForm(); load();
+    await spin(async () => {
+      await (editId ? api("?id=eq." + editId, {method: "PATCH", headers: {Prefer: "return=minimal"}, body})
+                    : api("", {method: "POST", headers: {Prefer: "return=minimal"}, body}));
+      resetForm(); await load();
+    });
   } catch (e) { $("err").textContent = "Save failed: " + e.message + " (did you run the category SQL?)"; }
 };
 
@@ -186,7 +221,7 @@ async function load() {
     const bal = carry + inc - exp;
     $("inc").textContent = inc; $("exp").textContent = exp;
     $("bal").textContent = "₹" + bal; $("bal").className = bal < 0 ? "neg" : "pos";
-    $("carry").textContent = $("cf").checked ? `Carried from earlier: ₹${carry}` : "";
+    $("carrybox").hidden = !$("cf").checked; $("carryv").textContent = carry;
     $("warn").hidden = bal >= LOW; $("warn").textContent = `⚠ Low balance (under ₹${LOW})`;
 
     const days = new Date(y, mo, 0).getDate(), cur = m === today.slice(0, 7);
@@ -205,7 +240,7 @@ async function load() {
       d.append(s);
       const b = document.createElement("button");
       b.className = "del"; b.textContent = "✕"; b.setAttribute("aria-label", "Delete");
-      b.onclick = async () => { if (confirm("Delete?")) { await api("?id=eq." + r.id, {method: "DELETE"}); load(); } };
+      b.onclick = async () => { if (confirm("Delete?")) { await spin(async () => { await api("?id=eq." + r.id, {method: "DELETE"}); await load(); }); } };
       li.append(d, b);
       return li;
     }));
@@ -225,7 +260,7 @@ $("csv").onclick = e => {
   a.download = `gharkharch-${$("month").value}.csv`; a.click();
 };
 
-if (S) { show(true); load(); } else show(false);
+if (S) { show(true); spin(load); } else show(false);
 setInterval(() => S && !editId && load(), 30000); // pick up the other person's entries
 </script>
 </body>
