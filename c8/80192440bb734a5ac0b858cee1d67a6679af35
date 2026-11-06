@@ -1,0 +1,20 @@
+index.html
+  s_0d23c1d2b14fd3::t_3a7d5c857c9716 214
+  s_0d23c1d2b14fd3::t_c0ed4d2718714c 5-11,14-40,46,48,50,52-74,80-83,86-87,90-96,105-106,108-112,122-126,130-131,133-172,175-197,199-204,207,215,219,221-225,229
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c880192440bb734a5ac0b858cee1d67a6679af35",
+  "prompts": {},
+  "sessions": {
+    "s_0d23c1d2b14fd3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f06bc34-fe40-48a0-9701-7096baf552e4",
+        "model": "unknown"
+      },
+      "human_author": "satish.gumudavelli <satish.gumudavelli@kitchen365.com>"
+    }
+  }
+}
