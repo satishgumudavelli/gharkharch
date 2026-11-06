@@ -52,11 +52,20 @@
   body.busy{cursor:progress}
   body.busy #list,body.busy .card{opacity:.5;transition:opacity .15s}
   body.busy button{pointer-events:none}
+  dialog{border:0;border-radius:16px;background:var(--card);color:var(--fg);padding:20px;width:calc(100% - 48px);max-width:340px;margin:auto}
+  dialog::backdrop{background:#0009}
+  dialog p{margin:0;font-size:1.1em;text-align:center}
+  .dact{display:flex;gap:8px;margin-top:18px}
+  .dact button{flex:1}
+  #dyes{background:var(--red)}
   [hidden]{display:none!important}
 </style>
 </head>
 <body>
 <div id="bar"></div>
+<dialog id="dlg"><p id="dmsg"></p>
+  <div class="dact"><button id="dno" class="chip">Cancel</button><button id="dyes">Delete</button></div>
+</dialog>
 <form id="login" hidden>
   <input class="full" type="password" id="pin" placeholder="PIN / password" required autocomplete="current-password">
   <button class="full">Unlock</button>
@@ -111,6 +120,12 @@ const spin = async f => {
   document.body.classList.add("busy"); busyN++;
   try { return await f(); } finally { if (!--busyN) document.body.classList.remove("busy"); }
 };
+const ask = msg => new Promise(res => { // styled replacement for confirm(); Esc counts as Cancel
+  const d = $("dlg"); $("dmsg").textContent = msg; d.returnValue = "";
+  d.onclose = () => res(d.returnValue === "yes"); d.showModal();
+});
+$("dyes").onclick = () => $("dlg").close("yes");
+$("dno").onclick = () => $("dlg").close("no");
 let S = null, rows = [], editId = null, cat = localStorage.cat || CATS[0];
 try { S = JSON.parse(localStorage.gk); } catch (e) {}
 
@@ -240,7 +255,7 @@ async function load() {
       d.append(s);
       const b = document.createElement("button");
       b.className = "del"; b.textContent = "✕"; b.setAttribute("aria-label", "Delete");
-      b.onclick = async () => { if (confirm("Delete?")) { await spin(async () => { await api("?id=eq." + r.id, {method: "DELETE"}); await load(); }); } };
+      b.onclick = async () => { if (await ask(`Delete ₹${r.amount} ${r.note || r.category || "entry"}?`)) { await spin(async () => { await api("?id=eq." + r.id, {method: "DELETE"}); await load(); }); } };
       li.append(d, b);
       return li;
     }));
