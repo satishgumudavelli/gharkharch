@@ -138,7 +138,7 @@ const toast = (msg, fn) => {
   clearTimeout(toastT); toastT = setTimeout(() => $("toast").hidden = true, 6000);
 };
 $("undo").onclick = () => spin(async () => { $("toast").hidden = true; await undoFn(); await load(); });
-let S = null, rows = [], editId = null, cat = localStorage.cat || CATS[0];
+let S = null, rows = [], editId = null, cat = CATS[0];
 try { S = JSON.parse(localStorage.gk); } catch (e) {}
 
 // --- iOS home-screen icon (drawn at runtime, no image file needed)
@@ -165,9 +165,9 @@ $("login").onsubmit = async e => {
   catch (e) { $("lerr").textContent = "Wrong PIN"; }
 };
 
-async function api(path, opt = {}) {
+async function api(path, opt = {}, table = "entries") {
   if (S.exp - Date.now() < 60000) await auth("refresh_token", {refresh_token: S.refresh_token});
-  const r = await fetch(URL_ + "/rest/v1/entries" + path, {...opt, headers: {apikey: KEY,
+  const r = await fetch(URL_ + "/rest/v1/" + table + path, {...opt, headers: {apikey: KEY,
     Authorization: "Bearer " + S.access_token, "Content-Type": "application/json", ...opt.headers}});
   if (!r.ok) throw new Error(r.status);
   return r.status === 204 ? null : r.text().then(t => t && JSON.parse(t));
@@ -175,8 +175,7 @@ async function api(path, opt = {}) {
 
 // --- form setup
 $("who").replaceChildren(...NAMES.map(n => new Option(n)));
-$("who").value = localStorage.who || NAMES[1];
-$("who").onchange = () => localStorage.who = $("who").value;
+$("who").value = NAMES[1];
 const today = new Date().toLocaleDateString("sv"); // local date (toISOString is UTC: wrong in IST)
 $("date").value = today;
 $("month").value = today.slice(0, 7);
@@ -187,14 +186,19 @@ const shift = n => { // move month by n (Date handles year rollover)
 };
 $("prev").onclick = () => shift(-1);
 $("next").onclick = () => shift(1);
-$("cf").checked = localStorage.cf === "1";
-$("cf").onchange = () => { localStorage.cf = $("cf").checked ? "1" : "0"; spin(load); };
+// carry toggle lives in the `settings` table so both phones agree
+$("cf").onchange = () => spin(async () => {
+  try { await api("", {method: "POST", headers: {Prefer: "resolution=merge-duplicates,return=minimal"},
+    body: JSON.stringify({key: "carry", value: $("cf").checked ? "1" : "0"})}, "settings"); }
+  catch (e) { $("err").textContent = "Could not save setting: " + e.message + " (did you run the settings SQL?)"; }
+  await load();
+});
 
 function drawCats() {
   $("cats").replaceChildren(...CATS.map(c => {
     const b = document.createElement("button");
     b.type = "button"; b.textContent = c; b.className = "chip" + (c === cat ? " on" : "");
-    b.onclick = () => { cat = c; localStorage.cat = c; drawCats(); };
+    b.onclick = () => { cat = c; drawCats(); };
     return b;
   }));
 }
@@ -234,6 +238,7 @@ $("f").onsubmit = async e => {
 // --- load + render
 async function load() {
   try {
+    const [s] = await api("?key=eq.carry", {}, "settings"); $("cf").checked = s?.value === "1";
     const m = $("month").value, [y, mo] = m.split("-").map(Number);
     const start = m + "-01", next = mo === 12 ? `${y + 1}-01-01` : `${y}-${String(mo + 1).padStart(2, "0")}-01`;
     rows = await api(`?select=*&date=gte.${start}&date=lt.${next}&order=date.desc,id.desc`);
