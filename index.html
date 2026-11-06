@@ -88,11 +88,10 @@
     <div class="stats">
       <div>Income<strong>₹<span id="inc">0</span></strong></div>
       <div>Expense<strong>₹<span id="exp">0</span></strong></div>
-      <div id="carrybox" hidden>Carried<strong>₹<span id="carryv">0</span></strong></div>
+      <div>Carried<strong>₹<span id="carryv">0</span></strong></div>
     </div>
     <small id="pace"></small>
   </div>
-  <label class="chk"><input type="checkbox" id="cf"> Carry leftover from earlier months</label>
 
   <form id="f">
     <input type="date" id="date" required>
@@ -186,13 +185,6 @@ const shift = n => { // move month by n (Date handles year rollover)
 };
 $("prev").onclick = () => shift(-1);
 $("next").onclick = () => shift(1);
-// carry toggle lives in the `settings` table so both phones agree
-$("cf").onchange = () => spin(async () => {
-  try { await api("", {method: "POST", headers: {Prefer: "resolution=merge-duplicates,return=minimal"},
-    body: JSON.stringify({key: "carry", value: $("cf").checked ? "1" : "0"})}, "settings"); }
-  catch (e) { $("err").textContent = "Could not save setting: " + e.message + " (did you run the settings SQL?)"; }
-  await load();
-});
 
 function drawCats() {
   $("cats").replaceChildren(...CATS.map(c => {
@@ -238,12 +230,11 @@ $("f").onsubmit = async e => {
 // --- load + render
 async function load() {
   try {
-    const [s] = await api("?key=eq.carry", {}, "settings"); $("cf").checked = s?.value === "1";
     const m = $("month").value, [y, mo] = m.split("-").map(Number);
     const start = m + "-01", next = mo === 12 ? `${y + 1}-01-01` : `${y}-${String(mo + 1).padStart(2, "0")}-01`;
     rows = await api(`?select=*&date=gte.${start}&date=lt.${next}&order=date.desc,id.desc`);
     // ponytail: server caps responses at 1000 rows; carry would undercount past that. Fix: store monthly totals.
-    const carry = $("cf").checked ? sum(await api(`?select=type,amount&date=lt.${start}`)) : 0;
+    const carry = sum(await api(`?select=type,amount&date=lt.${start}`)); // leftover from all earlier months
 
     let inc = 0, exp = 0; const by = {};
     for (const r of rows) {
@@ -253,7 +244,7 @@ async function load() {
     const bal = carry + inc - exp;
     $("inc").textContent = inc; $("exp").textContent = exp;
     $("bal").textContent = "₹" + bal; $("bal").className = bal < 0 ? "neg" : "pos";
-    $("carrybox").hidden = !$("cf").checked; $("carryv").textContent = carry;
+    $("carryv").textContent = carry;
     $("warn").hidden = bal >= LOW; $("warn").textContent = `⚠ Low balance (under ₹${LOW})`;
 
     const days = new Date(y, mo, 0).getDate(), cur = m === today.slice(0, 7);
