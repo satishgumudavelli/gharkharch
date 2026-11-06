@@ -78,7 +78,7 @@
 const URL_ = "https://drcenfbvcenegefozzsi.supabase.co";
 const KEY  = "sb_publishable_nM8K1MbZxXaU5r3lgFo98A_VQsTImE3";
 const EMAIL = "satish29g1993@gmail.com"; // shared Supabase Auth user; PIN = its password
-const NAMES = ["Satish", "Wife"];        // edit to your real names
+const NAMES = ["Satish", "Ankita"];       // edit to your real names
 const CATS  = ["Groceries", "Vegetables", "Milk", "Fuel", "Medical", "Bills", "Other"];
 const LOW   = 200;                       // warn when remaining drops below this
 
@@ -121,7 +121,7 @@ async function api(path, opt = {}) {
 
 // --- form setup
 $("who").replaceChildren(...NAMES.map(n => new Option(n)));
-$("who").value = localStorage.who || NAMES[0];
+$("who").value = localStorage.who || NAMES[1];
 $("who").onchange = () => localStorage.who = $("who").value;
 const today = new Date().toLocaleDateString("sv"); // local date (toISOString is UTC: wrong in IST)
 $("date").value = today;
