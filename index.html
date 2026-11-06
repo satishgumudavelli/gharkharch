@@ -52,20 +52,25 @@
   body.busy{cursor:progress}
   body.busy #list,body.busy .card{opacity:.5;transition:opacity .15s}
   body.busy button{pointer-events:none}
-  dialog{border:0;border-radius:16px;background:var(--card);color:var(--fg);padding:20px;width:calc(100% - 48px);max-width:340px;margin:auto}
-  dialog::backdrop{background:#0009}
-  dialog p{margin:0;font-size:1.1em;text-align:center}
-  .dact{display:flex;gap:8px;margin-top:18px}
-  .dact button{flex:1}
-  #dyes{background:var(--red)}
+  #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:max(16px,env(safe-area-inset-bottom));background:var(--fg);color:var(--bg);
+    border-radius:12px;padding:8px 8px 8px 16px;display:flex;align-items:center;gap:12px;z-index:10;max-width:calc(100% - 32px)}
+  #toast button{padding:8px 14px;min-height:36px}
+  .filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 4px}
+  #q{grid-column:1/-1}
+  #fsum{color:var(--mut);font-size:.85em;margin:0 4px 6px}
+  #brk{text-align:left;padding:12px 16px}
+  .cr{display:grid;grid-template-columns:92px 1fr auto;gap:10px;align-items:center;font-size:.9em;margin:6px 0;cursor:pointer}
+  .cr .t{background:var(--bd);border-radius:6px;height:10px;overflow:hidden}
+  .cr i{display:block;height:100%;background:var(--btn);border-radius:6px}
+  .cr i.over{background:var(--red)}
+  li.day{background:none;display:flex;justify-content:space-between;color:var(--mut);font-size:.85em;margin:12px 4px 4px}
+  li.empty{justify-content:center;padding:16px;color:var(--mut)}
   [hidden]{display:none!important}
 </style>
 </head>
 <body>
 <div id="bar"></div>
-<dialog id="dlg"><p id="dmsg"></p>
-  <div class="dact"><button id="dno" class="chip">Cancel</button><button id="dyes">Delete</button></div>
-</dialog>
+<div id="toast" hidden><span id="tmsg"></span><button id="undo">Undo</button></div>
 <form id="login" hidden>
   <input class="full" type="password" id="pin" placeholder="PIN / password" required autocomplete="current-password">
   <button class="full">Unlock</button>
@@ -100,7 +105,13 @@
     <button type="button" class="full" id="cancel" hidden>Cancel edit</button>
   </form>
   <div id="err"></div>
-  <div id="brk"></div>
+  <div id="brk" class="card" hidden></div>
+  <div class="filters">
+    <input id="q" type="search" placeholder="Search note, category, name…" enterkeyhint="search">
+    <select id="fwho"></select>
+    <select id="fcat"></select>
+  </div>
+  <div id="fsum"></div>
   <ul id="list"></ul>
   <p style="text-align:center"><a href="#" id="csv">Export CSV</a> · <a href="#" id="lock">Lock</a></p>
 </div>
@@ -112,6 +123,7 @@ const EMAIL = "satish29g1993@gmail.com"; // shared Supabase Auth user; PIN = its
 const NAMES = ["Satish", "Ankita"];       // edit to your real names
 const CATS  = ["Groceries", "Vegetables", "Milk", "Fuel", "Medical", "Bills", "Other"];
 const LOW   = 200;                       // warn when remaining drops below this
+const BUDGETS = {Groceries: 3000, Vegetables: 1500, Milk: 1000, Fuel: 1000}; // monthly ₹ limits per category; edit/add/remove freely
 
 const $ = id => document.getElementById(id);
 const sum = rows => rows.reduce((a, r) => a + (r.type === "income" ? +r.amount : -r.amount), 0);
@@ -120,12 +132,12 @@ const spin = async f => {
   document.body.classList.add("busy"); busyN++;
   try { return await f(); } finally { if (!--busyN) document.body.classList.remove("busy"); }
 };
-const ask = msg => new Promise(res => { // styled replacement for confirm(); Esc counts as Cancel
-  const d = $("dlg"); $("dmsg").textContent = msg; d.returnValue = "";
-  d.onclose = () => res(d.returnValue === "yes"); d.showModal();
-});
-$("dyes").onclick = () => $("dlg").close("yes");
-$("dno").onclick = () => $("dlg").close("no");
+let undoFn, toastT; // delete happens at once; the toast offers 6s to put it back
+const toast = (msg, fn) => {
+  $("tmsg").textContent = msg; undoFn = fn; $("toast").hidden = false;
+  clearTimeout(toastT); toastT = setTimeout(() => $("toast").hidden = true, 6000);
+};
+$("undo").onclick = () => spin(async () => { $("toast").hidden = true; await undoFn(); await load(); });
 let S = null, rows = [], editId = null, cat = localStorage.cat || CATS[0];
 try { S = JSON.parse(localStorage.gk); } catch (e) {}
 
@@ -243,28 +255,69 @@ async function load() {
     const dayNo = cur ? +today.slice(8) : days, left = days - dayNo + 1;
     $("pace").textContent = `Spending ₹${Math.round(exp / dayNo)}/day` +
       (cur && bal > 0 ? ` · ₹${Math.floor(bal / left)}/day for ${left} days left` : "");
-    $("brk").textContent = Object.entries(by).sort((a, b) => b[1] - a[1]).map(([c, v]) => `${c} ₹${v}`).join(" · ");
-
-    $("list").replaceChildren(...rows.map(r => {
-      const li = document.createElement("li"), d = document.createElement("div"), s = document.createElement("small");
-      d.className = "row"; d.onclick = () => startEdit(r);
-      const inc = r.type === "income";
-      d.textContent = (inc ? "+" : "−") + "₹" + r.amount + "  " + (r.note || (inc ? "" : r.category || ""));
-      if (inc) d.classList.add("pos");
-      s.textContent = [r.date, r.who, !inc && r.note && r.category].filter(Boolean).join(" · ");
-      d.append(s);
-      const b = document.createElement("button");
-      b.className = "del"; b.textContent = "✕"; b.setAttribute("aria-label", "Delete");
-      b.onclick = async () => { if (await ask(`Delete ₹${r.amount} ${r.note || r.category || "entry"}?`)) { await spin(async () => { await api("?id=eq." + r.id, {method: "DELETE"}); await load(); }); } };
-      li.append(d, b);
-      return li;
-    }));
+    drawBrk(by); render();
     $("err").textContent = "";
   } catch (e) {
     if (["400", "401", "403"].includes(e.message)) return logout(); // expired session / failed refresh
     $("err").textContent = "Load failed: " + e.message;
   }
 }
+
+// category bars; bar = spent vs budget (red when over), or vs biggest category if no budget. Tap a row to filter.
+function drawBrk(by) {
+  const names = [...new Set([...Object.keys(by), ...Object.keys(BUDGETS)])].sort((a, b) => (by[b] || 0) - (by[a] || 0));
+  const max = Math.max(...names.map(c => by[c] || 0), 1);
+  $("brk").hidden = !names.length;
+  $("brk").replaceChildren(...names.map(c => {
+    const v = by[c] || 0, b = BUDGETS[c], row = document.createElement("div"), t = document.createElement("div"),
+      i = document.createElement("i"), l = document.createElement("span"), a = document.createElement("span");
+    row.className = "cr"; t.className = "t"; t.append(i);
+    i.style.width = Math.min(100, v / (b || max) * 100) + "%"; if (b && v > b) i.className = "over";
+    l.textContent = c; a.textContent = "₹" + v + (b ? " / ₹" + b : "");
+    row.append(l, t, a); row.onclick = () => { $("fcat").value = c; render(); };
+    return row;
+  }));
+}
+
+const dayLabel = d => d === today ? "Today" : d === new Date(Date.now() - 864e5).toLocaleDateString("sv") ? "Yesterday"
+  : new Date(d + "T00:00").toLocaleDateString("en-IN", {weekday: "short", day: "numeric", month: "short"});
+
+function render() { // list only: filters apply here, month totals above stay for the whole month
+  const q = $("q").value.trim().toLowerCase(), fw = $("fwho").value, fc = $("fcat").value;
+  const shown = rows.filter(r => (!fw || r.who === fw) && (!fc || (r.type === "expense" && (r.category || "Other") === fc)) &&
+    (!q || [r.note, r.category, r.who, r.amount].join(" ").toLowerCase().includes(q)));
+  const dayExp = {}; let e = 0, i = 0;
+  for (const r of shown) r.type === "expense" ? (e += +r.amount, dayExp[r.date] = (dayExp[r.date] || 0) + +r.amount) : i += +r.amount;
+  $("fsum").textContent = q || fw || fc ? `${shown.length} shown · spent ₹${e}` + (i ? ` · income ₹${i}` : "") : "";
+
+  const out = []; let last;
+  for (const r of shown) {
+    if (r.date !== last) {
+      last = r.date; const h = document.createElement("li"); h.className = "day"; h.append(dayLabel(r.date));
+      if (dayExp[r.date]) { const s = document.createElement("span"); s.textContent = "−₹" + dayExp[r.date]; h.append(s); }
+      out.push(h);
+    }
+    const li = document.createElement("li"), d = document.createElement("div"), s = document.createElement("small"), inc = r.type === "income";
+    d.className = "row"; d.onclick = () => startEdit(r);
+    d.textContent = (inc ? "+" : "−") + "₹" + r.amount + "  " + (r.note || (inc ? "" : r.category || ""));
+    if (inc) d.classList.add("pos");
+    s.textContent = [r.who, !inc && r.note && r.category].filter(Boolean).join(" · ");
+    d.append(s);
+    const b = document.createElement("button");
+    b.className = "del"; b.textContent = "✕"; b.setAttribute("aria-label", "Delete");
+    b.onclick = async () => {
+      await spin(async () => { await api("?id=eq." + r.id, {method: "DELETE"}); await load(); });
+      toast(`Deleted ₹${r.amount} ${r.note || r.category || ""}`, () => api("", {method: "POST", headers: {Prefer: "return=minimal"},
+        body: JSON.stringify({date: r.date, type: r.type, amount: r.amount, who: r.who, note: r.note, category: r.category})}));
+    };
+    li.append(d, b); out.push(li);
+  }
+  if (!shown.length) { const li = document.createElement("li"); li.className = "empty"; li.textContent = "No entries"; out.push(li); }
+  $("list").replaceChildren(...out);
+}
+$("fwho").replaceChildren(new Option("Everyone", ""), ...NAMES.map(n => new Option(n)));
+$("fcat").replaceChildren(new Option("All categories", ""), ...CATS.map(c => new Option(c)));
+$("q").oninput = $("fwho").onchange = $("fcat").onchange = render;
 
 $("csv").onclick = e => {
   e.preventDefault();
