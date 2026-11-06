@@ -2,63 +2,98 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Gharkharch">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#0a7">
+<meta name="color-scheme" content="light dark">
 <title>Gharkharch</title>
 <style>
-  body{font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:16px;background:#f5f5f5;color:#222}
-  .bal{background:#fff;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 3px #0002}
-  .bal b{font-size:2.4em;display:block}
-  .neg{color:#c00}.pos{color:#080}
-  form{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0}
-  form input,form select,form button{padding:10px;font-size:1em;border:1px solid #ccc;border-radius:8px}
-  form .full{grid-column:1/-1}
-  button{background:#222;color:#fff;cursor:pointer}
-  ul{list-style:none;padding:0}
-  li{background:#fff;border-radius:8px;padding:10px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px}
-  li small{color:#777;display:block}
-  li button{background:none;color:#c00;border:0;font-size:1.2em}
-  #err{color:#c00}
+  :root{--bg:#f2f2f7;--card:#fff;--fg:#1c1c1e;--mut:#6e6e73;--bd:#d1d1d6;--btn:#0a7;--red:#d00;--grn:#0a7}
+  @media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--fg:#f2f2f7;--mut:#98989d;--bd:#3a3a3c;--red:#ff453a;--grn:#30d158}}
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,system-ui,sans-serif;max-width:480px;margin:0 auto;background:var(--bg);color:var(--fg);
+    padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+  input,select,button{font:inherit;font-size:16px;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--fg);min-height:44px}
+  button{background:var(--btn);color:#fff;border:0;font-weight:600}
+  .card{background:var(--card);border-radius:14px;padding:16px;text-align:center;margin-bottom:8px}
+  .card b{font-size:2.6em;display:block}
+  .card small{color:var(--mut);display:block;margin-top:4px}
+  .neg{color:var(--red)}.pos{color:var(--grn)}
+  #warn{background:var(--red);color:#fff;border-radius:10px;padding:8px;text-align:center;margin-bottom:8px}
+  form{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+  .full{grid-column:1/-1}
+  #cats{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{background:var(--card);color:var(--fg);border:1px solid var(--bd);padding:8px 12px;min-height:36px;font-weight:400}
+  .chip.on{background:var(--btn);color:#fff;border-color:var(--btn)}
+  #cancel{background:var(--mut)}
+  ul{list-style:none;padding:0;margin:0}
+  li{background:var(--card);border-radius:10px;margin-bottom:6px;display:flex;align-items:center}
+  li .row{flex:1;padding:12px;cursor:pointer}
+  li small{color:var(--mut);display:block}
+  li .del{background:none;color:var(--red);font-size:1.3em;width:48px}
+  #err,#lerr{color:var(--red)}
+  #brk{color:var(--mut);font-size:.9em;margin:8px 0;text-align:center}
+  a{color:var(--mut)}
+  label{color:var(--mut);font-size:.9em}
   [hidden]{display:none!important}
 </style>
 </head>
 <body>
 <form id="login" hidden>
-  <input class="full" type="password" id="pin" placeholder="PIN / password" required autofocus>
+  <input class="full" type="password" id="pin" placeholder="PIN / password" required autocomplete="current-password">
   <button class="full">Unlock</button>
-  <div class="full" id="lerr" style="color:#c00"></div>
+  <div class="full" id="lerr"></div>
 </form>
-<div id="app" hidden>
-<input type="month" id="month" style="width:100%;padding:10px;margin-bottom:8px;font-size:1em;box-sizing:border-box">
-<div class="bal">Remaining<b id="bal">₹0</b>
-  <small>Income ₹<span id="inc">0</span> · Expense ₹<span id="exp">0</span></small>
-  <br><a href="#" id="lock">Lock</a></div>
 
-<form id="f">
-  <input type="date" id="date" required>
-  <select id="type"><option value="expense">Expense</option><option value="income">Income</option></select>
-  <input type="number" id="amount" placeholder="Amount ₹" min="1" step="any" required>
-  <select id="who"></select>
-  <input class="full" id="note" placeholder="Note (milk, vegetables...)">
-  <button class="full">Add</button>
-</form>
-<div id="err"></div>
-<ul id="list"></ul>
+<div id="app" hidden>
+  <input type="month" id="month" style="width:100%;margin-bottom:8px">
+  <div id="warn" hidden></div>
+  <div class="card">Remaining<b id="bal">₹0</b>
+    <small>Income ₹<span id="inc">0</span> · Expense ₹<span id="exp">0</span></small>
+    <small id="carry"></small>
+    <small id="pace"></small>
+  </div>
+  <label><input type="checkbox" id="cf"> Carry leftover from earlier months</label>
+
+  <form id="f">
+    <input type="date" id="date" required>
+    <select id="type"><option value="expense">Expense</option><option value="income">Income</option></select>
+    <input type="number" id="amount" inputmode="decimal" placeholder="Amount ₹" min="0.01" step="any" required>
+    <select id="who"></select>
+    <div class="full" id="cats"></div>
+    <input class="full" id="note" placeholder="Note (optional)" enterkeyhint="done">
+    <button class="full" id="go">Add</button>
+    <button type="button" class="full" id="cancel" hidden>Cancel edit</button>
+  </form>
+  <div id="err"></div>
+  <div id="brk"></div>
+  <ul id="list"></ul>
+  <p style="text-align:center"><a href="#" id="csv">Export CSV</a> · <a href="#" id="lock">Lock</a></p>
 </div>
 
 <script>
-// Fill these from Supabase → Project Settings → API
 const URL_ = "https://drcenfbvcenegefozzsi.supabase.co";
 const KEY  = "sb_publishable_nM8K1MbZxXaU5r3lgFo98A_VQsTImE3";
+const EMAIL = "satish29g1993@gmail.com"; // shared Supabase Auth user; PIN = its password
+const NAMES = ["Satish", "Wife"];        // edit to your real names
+const CATS  = ["Groceries", "Vegetables", "Milk", "Fuel", "Medical", "Bills", "Other"];
+const LOW   = 200;                       // warn when remaining drops below this
 
-const EMAIL = "satish29g1993@gmail.com"; // the shared user you create in Supabase Auth; PIN = its password
-const NAMES = ["Satish", "Wife"]; // edit to your real names
 const $ = id => document.getElementById(id);
-$("who").replaceChildren(...NAMES.map(n => new Option(n)));
-$("who").value = localStorage.who || NAMES[0];
-$("who").onchange = () => localStorage.who = $("who").value; // remember per phone
-let S = null; // session {access_token, refresh_token, exp}
+const sum = rows => rows.reduce((a, r) => a + (r.type === "income" ? +r.amount : -r.amount), 0);
+let S = null, rows = [], editId = null, cat = localStorage.cat || CATS[0];
 try { S = JSON.parse(localStorage.gk); } catch (e) {}
 
+// --- iOS home-screen icon (drawn at runtime, no image file needed)
+{ const c = document.createElement("canvas"); c.width = c.height = 180;
+  const g = c.getContext("2d"); g.fillStyle = "#0a7"; g.fillRect(0, 0, 180, 180);
+  g.fillStyle = "#fff"; g.font = "bold 120px sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("₹", 90, 95);
+  const l = document.createElement("link"); l.rel = "apple-touch-icon"; l.href = c.toDataURL(); document.head.append(l); }
+
+// --- auth (PIN = password of shared Supabase user)
 async function auth(grant, body) {
   const r = await fetch(URL_ + "/auth/v1/token?grant_type=" + grant, {method: "POST",
     headers: {apikey: KEY, "Content-Type": "application/json"}, body: JSON.stringify(body)});
@@ -67,9 +102,14 @@ async function auth(grant, body) {
   S = {access_token: j.access_token, refresh_token: j.refresh_token, exp: Date.now() + j.expires_in * 1000};
   localStorage.gk = JSON.stringify(S);
 }
-function show(on) { $("app").hidden = !on; $("login").hidden = on; }
-function logout() { S = null; delete localStorage.gk; show(false); }
+const show = on => { $("app").hidden = !on; $("login").hidden = on; };
+const logout = () => { S = null; delete localStorage.gk; show(false); };
 $("lock").onclick = e => { e.preventDefault(); logout(); };
+$("login").onsubmit = async e => {
+  e.preventDefault();
+  try { await auth("password", {email: EMAIL, password: $("pin").value}); $("pin").value = ""; $("lerr").textContent = ""; show(true); load(); }
+  catch (e) { $("lerr").textContent = "Wrong PIN"; }
+};
 
 async function api(path, opt = {}) {
   if (S.exp - Date.now() < 60000) await auth("refresh_token", {refresh_token: S.refresh_token});
@@ -79,62 +119,114 @@ async function api(path, opt = {}) {
   return r.status === 204 ? null : r.text().then(t => t && JSON.parse(t));
 }
 
-$("login").onsubmit = async e => {
-  e.preventDefault();
-  try { await auth("password", {email: EMAIL, password: $("pin").value}); $("pin").value = ""; show(true); load(); }
-  catch (e) { $("lerr").textContent = "Wrong PIN"; }
-};
-
-const today = new Date().toLocaleDateString("sv"); // local YYYY-MM-DD (toISOString is UTC: wrong day/month in IST)
+// --- form setup
+$("who").replaceChildren(...NAMES.map(n => new Option(n)));
+$("who").value = localStorage.who || NAMES[0];
+$("who").onchange = () => localStorage.who = $("who").value;
+const today = new Date().toLocaleDateString("sv"); // local date (toISOString is UTC: wrong in IST)
 $("date").value = today;
 $("month").value = today.slice(0, 7);
 $("month").onchange = () => $("month").value && load();
+$("cf").checked = localStorage.cf === "1";
+$("cf").onchange = () => { localStorage.cf = $("cf").checked ? "1" : "0"; load(); };
 
-async function load() {
-  try {
-    const [y, mo] = $("month").value.split("-").map(Number);
-    const next = mo === 12 ? `${y + 1}-01-01` : `${y}-${String(mo + 1).padStart(2, "0")}-01`;
-    const rows = await api(`?select=*&date=gte.${$("month").value}-01&date=lt.${next}&order=date.desc,id.desc`);
-    let inc = 0, exp = 0;
-    $("list").replaceChildren(...rows.map(r => {
-      r.type === "income" ? inc += +r.amount : exp += +r.amount;
-      const li = document.createElement("li");
-      const d = document.createElement("div");
-      d.textContent = (r.type === "income" ? "+" : "−") + "₹" + r.amount + "  " + (r.note || "");
-      d.className = r.type === "income" ? "pos" : "";
-      const s = document.createElement("small");
-      s.textContent = r.date + " · " + r.who;
-      d.append(s);
-      const b = document.createElement("button");
-      b.textContent = "✕";
-      b.onclick = async () => { if (confirm("Delete?")) { await api("?id=eq." + r.id, {method: "DELETE"}); load(); } };
-      li.append(d, b);
-      return li;
-    }));
-    $("inc").textContent = inc; $("exp").textContent = exp;
-    const bal = inc - exp;
-    $("bal").textContent = "₹" + bal;
-    $("bal").className = bal < 0 ? "neg" : "pos";
-    $("err").textContent = "";
-  } catch (e) {
-    if (["400", "401", "403"].includes(e.message)) return logout(); // expired/invalid session
-    $("err").textContent = "Load failed: " + e.message + " (check URL/key/table)";
-  }
+function drawCats() {
+  $("cats").replaceChildren(...CATS.map(c => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = c; b.className = "chip" + (c === cat ? " on" : "");
+    b.onclick = () => { cat = c; localStorage.cat = c; drawCats(); };
+    return b;
+  }));
+}
+drawCats();
+$("type").onchange = () => $("cats").hidden = $("type").value === "income";
+
+function resetForm() {
+  editId = null; $("go").textContent = "Add"; $("cancel").hidden = true;
+  $("amount").value = ""; $("note").value = ""; $("date").value = today;
+}
+$("cancel").onclick = resetForm;
+
+function startEdit(r) {
+  editId = r.id;
+  if (![...$("who").options].some(o => o.value === r.who)) $("who").add(new Option(r.who));
+  $("date").value = r.date; $("type").value = r.type; $("amount").value = r.amount;
+  $("who").value = r.who; $("note").value = r.note || "";
+  if (r.category) { cat = r.category; drawCats(); }
+  $("cats").hidden = r.type === "income";
+  $("go").textContent = "Save changes"; $("cancel").hidden = false;
+  scrollTo(0, 0);
 }
 
 $("f").onsubmit = async e => {
   e.preventDefault();
+  const body = JSON.stringify({date: $("date").value, type: $("type").value, amount: +$("amount").value,
+    who: $("who").value, note: $("note").value.trim(), category: $("type").value === "expense" ? cat : null});
   try {
-    await api("", {method: "POST", headers: {Prefer: "return=minimal"}, body: JSON.stringify({
-      date: $("date").value, type: $("type").value, amount: +$("amount").value,
-      who: $("who").value, note: $("note").value.trim()})});
-    $("amount").value = ""; $("note").value = "";
-    load();
-  } catch (e) { $("err").textContent = "Save failed: " + e.message; }
+    await (editId ? api("?id=eq." + editId, {method: "PATCH", headers: {Prefer: "return=minimal"}, body})
+                  : api("", {method: "POST", headers: {Prefer: "return=minimal"}, body}));
+    resetForm(); load();
+  } catch (e) { $("err").textContent = "Save failed: " + e.message + " (did you run the category SQL?)"; }
+};
+
+// --- load + render
+async function load() {
+  try {
+    const m = $("month").value, [y, mo] = m.split("-").map(Number);
+    const start = m + "-01", next = mo === 12 ? `${y + 1}-01-01` : `${y}-${String(mo + 1).padStart(2, "0")}-01`;
+    rows = await api(`?select=*&date=gte.${start}&date=lt.${next}&order=date.desc,id.desc`);
+    // ponytail: server caps responses at 1000 rows; carry would undercount past that. Fix: store monthly totals.
+    const carry = $("cf").checked ? sum(await api(`?select=type,amount&date=lt.${start}`)) : 0;
+
+    let inc = 0, exp = 0; const by = {};
+    for (const r of rows) {
+      if (r.type === "income") inc += +r.amount;
+      else { exp += +r.amount; const c = r.category || "Other"; by[c] = (by[c] || 0) + +r.amount; }
+    }
+    const bal = carry + inc - exp;
+    $("inc").textContent = inc; $("exp").textContent = exp;
+    $("bal").textContent = "₹" + bal; $("bal").className = bal < 0 ? "neg" : "pos";
+    $("carry").textContent = $("cf").checked ? `Carried from earlier: ₹${carry}` : "";
+    $("warn").hidden = bal >= LOW; $("warn").textContent = `⚠ Low balance (under ₹${LOW})`;
+
+    const days = new Date(y, mo, 0).getDate(), cur = m === today.slice(0, 7);
+    const dayNo = cur ? +today.slice(8) : days, left = days - dayNo + 1;
+    $("pace").textContent = `Spending ₹${Math.round(exp / dayNo)}/day` +
+      (cur && bal > 0 ? ` · ₹${Math.floor(bal / left)}/day for ${left} days left` : "");
+    $("brk").textContent = Object.entries(by).sort((a, b) => b[1] - a[1]).map(([c, v]) => `${c} ₹${v}`).join(" · ");
+
+    $("list").replaceChildren(...rows.map(r => {
+      const li = document.createElement("li"), d = document.createElement("div"), s = document.createElement("small");
+      d.className = "row"; d.onclick = () => startEdit(r);
+      const inc = r.type === "income";
+      d.textContent = (inc ? "+" : "−") + "₹" + r.amount + "  " + (r.note || (inc ? "" : r.category || ""));
+      if (inc) d.classList.add("pos");
+      s.textContent = [r.date, r.who, !inc && r.note && r.category].filter(Boolean).join(" · ");
+      d.append(s);
+      const b = document.createElement("button");
+      b.className = "del"; b.textContent = "✕"; b.setAttribute("aria-label", "Delete");
+      b.onclick = async () => { if (confirm("Delete?")) { await api("?id=eq." + r.id, {method: "DELETE"}); load(); } };
+      li.append(d, b);
+      return li;
+    }));
+    $("err").textContent = "";
+  } catch (e) {
+    if (["400", "401", "403"].includes(e.message)) return logout(); // expired session / failed refresh
+    $("err").textContent = "Load failed: " + e.message;
+  }
+}
+
+$("csv").onclick = e => {
+  e.preventDefault();
+  const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const csv = "date,type,amount,who,category,note\n" + rows.map(r => [r.date, r.type, r.amount, r.who, r.category, r.note].map(q).join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], {type: "text/csv"}));
+  a.download = `gharkharch-${$("month").value}.csv`; a.click();
 };
 
 if (S) { show(true); load(); } else show(false);
-setInterval(() => S && load(), 30000); // pick up the other person's entries
+setInterval(() => S && !editId && load(), 30000); // pick up the other person's entries
 </script>
 </body>
 </html>
