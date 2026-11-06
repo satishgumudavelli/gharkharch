@@ -65,6 +65,8 @@
   .cr i.over{background:var(--red)}
   li.day{background:none;display:flex;justify-content:space-between;color:var(--mut);font-size:.85em;margin:12px 4px 4px}
   li.empty{justify-content:center;padding:16px;color:var(--mut)}
+  summary{cursor:pointer;color:var(--mut);padding:8px 4px}
+  label.bg{display:grid;grid-template-columns:100px 1fr;gap:8px;align-items:center;margin:6px 0}
   [hidden]{display:none!important}
 </style>
 </head>
@@ -91,6 +93,7 @@
       <div>Carried<strong>₹<span id="carryv">0</span></strong></div>
     </div>
     <small id="pace"></small>
+    <small id="people"></small>
   </div>
 
   <form id="f">
@@ -105,6 +108,10 @@
   </form>
   <div id="err"></div>
   <div id="brk" class="card" hidden></div>
+  <details id="bd"><summary>Edit budgets</summary>
+    <div id="bgrid"></div>
+    <button id="bsave" type="button" style="width:100%;margin-top:8px">Save budgets</button>
+  </details>
   <div class="filters">
     <input id="q" type="search" placeholder="Search note, category, name…" enterkeyhint="search">
     <select id="fwho"></select>
@@ -122,10 +129,10 @@ const EMAIL = "satish29g1993@gmail.com"; // shared Supabase Auth user; PIN = its
 const NAMES = ["Satish", "Ankita"];       // edit to your real names
 const CATS  = ["Groceries", "Vegetables", "Milk", "Fuel", "Medical", "Bills", "Other"];
 const LOW   = 200;                       // warn when remaining drops below this
-const BUDGETS = {Groceries: 3000, Vegetables: 1500, Milk: 1000, Fuel: 1000}; // monthly ₹ limits per category; edit/add/remove freely
+let budgets = {}; // category -> monthly ₹ limit, loaded from the `budgets` table
 
 const $ = id => document.getElementById(id);
-const sum = rows => rows.reduce((a, r) => a + (r.type === "income" ? +r.amount : -r.amount), 0);
+const fmt = n => Number(n).toLocaleString("en-IN", {maximumFractionDigits: 2}); // 1,00,000 style
 let busyN = 0; // loader: top bar + dimmed card/list + buttons locked while a user action is running
 const spin = async f => {
   document.body.classList.add("busy"); busyN++;
@@ -233,24 +240,26 @@ async function load() {
     const m = $("month").value, [y, mo] = m.split("-").map(Number);
     const start = m + "-01", next = mo === 12 ? `${y + 1}-01-01` : `${y}-${String(mo + 1).padStart(2, "0")}-01`;
     rows = await api(`?select=*&date=gte.${start}&date=lt.${next}&order=date.desc,id.desc`);
-    // ponytail: server caps responses at 1000 rows; carry would undercount past that. Fix: store monthly totals.
-    const carry = sum(await api(`?select=type,amount&date=lt.${start}`)); // leftover from all earlier months
+    // leftover from all earlier months, summed in the DB (carry_before function): no row cap
+    const carry = +await api("/carry_before", {method: "POST", body: JSON.stringify({d: start})}, "rpc");
+    budgets = Object.fromEntries((await api("?select=*", {}, "budgets")).map(x => [x.category, +x.amount]));
 
-    let inc = 0, exp = 0; const by = {};
+    let inc = 0, exp = 0; const by = {}, who = {};
     for (const r of rows) {
       if (r.type === "income") inc += +r.amount;
-      else { exp += +r.amount; const c = r.category || "Other"; by[c] = (by[c] || 0) + +r.amount; }
+      else { exp += +r.amount; const c = r.category || "Other"; by[c] = (by[c] || 0) + +r.amount; who[r.who] = (who[r.who] || 0) + +r.amount; }
     }
     const bal = carry + inc - exp;
-    $("inc").textContent = inc; $("exp").textContent = exp;
-    $("bal").textContent = "₹" + bal; $("bal").className = bal < 0 ? "neg" : "pos";
-    $("carryv").textContent = carry;
+    $("inc").textContent = fmt(inc); $("exp").textContent = fmt(exp);
+    $("bal").textContent = "₹" + fmt(bal); $("bal").className = bal < 0 ? "neg" : "pos";
+    $("carryv").textContent = fmt(carry);
+    $("people").textContent = exp ? "Spent by " + Object.entries(who).sort((a, b) => b[1] - a[1]).map(([n, v]) => `${n} ₹${fmt(v)}`).join(" · ") : "";
     $("warn").hidden = bal >= LOW; $("warn").textContent = `⚠ Low balance (under ₹${LOW})`;
 
     const days = new Date(y, mo, 0).getDate(), cur = m === today.slice(0, 7);
     const dayNo = cur ? +today.slice(8) : days, left = days - dayNo + 1;
-    $("pace").textContent = `Spending ₹${Math.round(exp / dayNo)}/day` +
-      (cur && bal > 0 ? ` · ₹${Math.floor(bal / left)}/day for ${left} days left` : "");
+    $("pace").textContent = `Spending ₹${fmt(Math.round(exp / dayNo))}/day` +
+      (cur && bal > 0 ? ` · ₹${fmt(Math.floor(bal / left))}/day for ${left} days left` : "");
     drawBrk(by); render();
     $("err").textContent = "";
   } catch (e) {
@@ -261,15 +270,15 @@ async function load() {
 
 // category bars; bar = spent vs budget (red when over), or vs biggest category if no budget. Tap a row to filter.
 function drawBrk(by) {
-  const names = [...new Set([...Object.keys(by), ...Object.keys(BUDGETS)])].sort((a, b) => (by[b] || 0) - (by[a] || 0));
+  const names = [...new Set([...Object.keys(by), ...Object.keys(budgets)])].sort((a, b) => (by[b] || 0) - (by[a] || 0));
   const max = Math.max(...names.map(c => by[c] || 0), 1);
   $("brk").hidden = !names.length;
   $("brk").replaceChildren(...names.map(c => {
-    const v = by[c] || 0, b = BUDGETS[c], row = document.createElement("div"), t = document.createElement("div"),
+    const v = by[c] || 0, b = budgets[c], row = document.createElement("div"), t = document.createElement("div"),
       i = document.createElement("i"), l = document.createElement("span"), a = document.createElement("span");
     row.className = "cr"; t.className = "t"; t.append(i);
     i.style.width = Math.min(100, v / (b || max) * 100) + "%"; if (b && v > b) i.className = "over";
-    l.textContent = c; a.textContent = "₹" + v + (b ? " / ₹" + b : "");
+    l.textContent = c; a.textContent = "₹" + fmt(v) + (b ? " / ₹" + fmt(b) : "");
     row.append(l, t, a); row.onclick = () => { $("fcat").value = c; render(); };
     return row;
   }));
@@ -284,18 +293,18 @@ function render() { // list only: filters apply here, month totals above stay fo
     (!q || [r.note, r.category, r.who, r.amount].join(" ").toLowerCase().includes(q)));
   const dayExp = {}; let e = 0, i = 0;
   for (const r of shown) r.type === "expense" ? (e += +r.amount, dayExp[r.date] = (dayExp[r.date] || 0) + +r.amount) : i += +r.amount;
-  $("fsum").textContent = q || fw || fc ? `${shown.length} shown · spent ₹${e}` + (i ? ` · income ₹${i}` : "") : "";
+  $("fsum").textContent = q || fw || fc ? `${shown.length} shown · spent ₹${fmt(e)}` + (i ? ` · income ₹${fmt(i)}` : "") : "";
 
   const out = []; let last;
   for (const r of shown) {
     if (r.date !== last) {
       last = r.date; const h = document.createElement("li"); h.className = "day"; h.append(dayLabel(r.date));
-      if (dayExp[r.date]) { const s = document.createElement("span"); s.textContent = "−₹" + dayExp[r.date]; h.append(s); }
+      if (dayExp[r.date]) { const s = document.createElement("span"); s.textContent = "−₹" + fmt(dayExp[r.date]); h.append(s); }
       out.push(h);
     }
     const li = document.createElement("li"), d = document.createElement("div"), s = document.createElement("small"), inc = r.type === "income";
     d.className = "row"; d.onclick = () => startEdit(r);
-    d.textContent = (inc ? "+" : "−") + "₹" + r.amount + "  " + (r.note || (inc ? "" : r.category || ""));
+    d.textContent = (inc ? "+" : "−") + "₹" + fmt(r.amount) + "  " + (r.note || (inc ? "" : r.category || ""));
     if (inc) d.classList.add("pos");
     s.textContent = [r.who, !inc && r.note && r.category].filter(Boolean).join(" · ");
     d.append(s);
@@ -303,7 +312,7 @@ function render() { // list only: filters apply here, month totals above stay fo
     b.className = "del"; b.textContent = "✕"; b.setAttribute("aria-label", "Delete");
     b.onclick = async () => {
       await spin(async () => { await api("?id=eq." + r.id, {method: "DELETE"}); await load(); });
-      toast(`Deleted ₹${r.amount} ${r.note || r.category || ""}`, () => api("", {method: "POST", headers: {Prefer: "return=minimal"},
+      toast(`Deleted ₹${fmt(r.amount)}${r.note || r.category || ""}`, () => api("", {method: "POST", headers: {Prefer: "return=minimal"},
         body: JSON.stringify({date: r.date, type: r.type, amount: r.amount, who: r.who, note: r.note, category: r.category})}));
     };
     li.append(d, b); out.push(li);
@@ -311,6 +320,26 @@ function render() { // list only: filters apply here, month totals above stay fo
   if (!shown.length) { const li = document.createElement("li"); li.className = "empty"; li.textContent = "No entries"; out.push(li); }
   $("list").replaceChildren(...out);
 }
+// budget editor: inputs are built fresh on open so the 30s refresh never wipes what you're typing
+$("bd").ontoggle = () => {
+  if (!$("bd").open) return;
+  $("bgrid").replaceChildren(...CATS.map(c => {
+    const l = document.createElement("label"), s = document.createElement("span"), i = document.createElement("input");
+    l.className = "bg"; s.textContent = c; i.type = "number"; i.inputMode = "decimal"; i.min = 1;
+    i.placeholder = "No limit"; i.dataset.c = c; i.value = budgets[c] || "";
+    l.append(s, i); return l;
+  }));
+};
+$("bsave").onclick = () => spin(async () => {
+  const ins = [...$("bgrid").querySelectorAll("input")];
+  const set = ins.filter(i => +i.value > 0).map(i => ({category: i.dataset.c, amount: +i.value}));
+  const clear = ins.filter(i => !(+i.value > 0)).map(i => i.dataset.c);
+  try {
+    if (set.length) await api("", {method: "POST", headers: {Prefer: "resolution=merge-duplicates,return=minimal"}, body: JSON.stringify(set)}, "budgets");
+    if (clear.length) await api(`?category=in.(${clear.join(",")})`, {method: "DELETE"}, "budgets");
+    $("bd").open = false; await load();
+  } catch (e) { $("err").textContent = "Could not save budgets: " + e.message; }
+});
 $("fwho").replaceChildren(new Option("Everyone", ""), ...NAMES.map(n => new Option(n)));
 $("fcat").replaceChildren(new Option("All categories", ""), ...CATS.map(c => new Option(c)));
 $("q").oninput = $("fwho").onchange = $("fcat").onchange = render;
