@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gharkharch</title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:16px;background:#f5f5f5;color:#222}
+  .bal{background:#fff;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 3px #0002}
+  .bal b{font-size:2.4em;display:block}
+  .neg{color:#c00}.pos{color:#080}
+  form{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0}
+  form input,form select,form button{padding:10px;font-size:1em;border:1px solid #ccc;border-radius:8px}
+  form .full{grid-column:1/-1}
+  button{background:#222;color:#fff;cursor:pointer}
+  ul{list-style:none;padding:0}
+  li{background:#fff;border-radius:8px;padding:10px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  li small{color:#777;display:block}
+  li button{background:none;color:#c00;border:0;font-size:1.2em}
+  #err{color:#c00}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<form id="login" hidden>
+  <input class="full" type="password" id="pin" placeholder="PIN / password" required autofocus>
+  <button class="full">Unlock</button>
+  <div class="full" id="lerr" style="color:#c00"></div>
+</form>
+<div id="app" hidden>
+<input type="month" id="month" style="width:100%;padding:10px;margin-bottom:8px;font-size:1em;box-sizing:border-box">
+<div class="bal">Remaining<b id="bal">₹0</b>
+  <small>Income ₹<span id="inc">0</span> · Expense ₹<span id="exp">0</span></small>
+  <br><a href="#" id="lock">Lock</a></div>
+
+<form id="f">
+  <input type="date" id="date" required>
+  <select id="type"><option value="expense">Expense</option><option value="income">Income</option></select>
+  <input type="number" id="amount" placeholder="Amount ₹" min="1" step="any" required>
+  <select id="who"></select>
+  <input class="full" id="note" placeholder="Note (milk, vegetables...)">
+  <button class="full">Add</button>
+</form>
+<div id="err"></div>
+<ul id="list"></ul>
+</div>
+
+<script>
+// Fill these from Supabase → Project Settings → API
+const URL_ = "https://drcenfbvcenegefozzsi.supabase.co";
+const KEY  = "sb_publishable_nM8K1MbZxXaU5r3lgFo98A_VQsTImE3";
+
+const EMAIL = "gharkharch@example.com"; // the shared user you create in Supabase Auth; PIN = its password
+const NAMES = ["Satish", "Wife"]; // edit to your real names
+const $ = id => document.getElementById(id);
+$("who").replaceChildren(...NAMES.map(n => new Option(n)));
+$("who").value = localStorage.who || NAMES[0];
+$("who").onchange = () => localStorage.who = $("who").value; // remember per phone
+let S = null; // session {access_token, refresh_token, exp}
+try { S = JSON.parse(localStorage.gk); } catch (e) {}
+
+async function auth(grant, body) {
+  const r = await fetch(URL_ + "/auth/v1/token?grant_type=" + grant, {method: "POST",
+    headers: {apikey: KEY, "Content-Type": "application/json"}, body: JSON.stringify(body)});
+  if (!r.ok) throw new Error(r.status);
+  const j = await r.json();
+  S = {access_token: j.access_token, refresh_token: j.refresh_token, exp: Date.now() + j.expires_in * 1000};
+  localStorage.gk = JSON.stringify(S);
+}
+function show(on) { $("app").hidden = !on; $("login").hidden = on; }
+function logout() { S = null; delete localStorage.gk; show(false); }
+$("lock").onclick = e => { e.preventDefault(); logout(); };
+
+async function api(path, opt = {}) {
+  if (S.exp - Date.now() < 60000) await auth("refresh_token", {refresh_token: S.refresh_token});
+  const r = await fetch(URL_ + "/rest/v1/entries" + path, {...opt, headers: {apikey: KEY,
+    Authorization: "Bearer " + S.access_token, "Content-Type": "application/json", ...opt.headers}});
+  if (!r.ok) throw new Error(r.status);
+  return r.status === 204 ? null : r.text().then(t => t && JSON.parse(t));
+}
+
+$("login").onsubmit = async e => {
+  e.preventDefault();
+  try { await auth("password", {email: EMAIL, password: $("pin").value}); $("pin").value = ""; show(true); load(); }
+  catch (e) { $("lerr").textContent = "Wrong PIN"; }
+};
+
+const today = new Date().toLocaleDateString("sv"); // local YYYY-MM-DD (toISOString is UTC: wrong day/month in IST)
+$("date").value = today;
+$("month").value = today.slice(0, 7);
+$("month").onchange = () => $("month").value && load();
+
+async function load() {
+  try {
+    const [y, mo] = $("month").value.split("-").map(Number);
+    const next = mo === 12 ? `${y + 1}-01-01` : `${y}-${String(mo + 1).padStart(2, "0")}-01`;
+    const rows = await api(`?select=*&date=gte.${$("month").value}-01&date=lt.${next}&order=date.desc,id.desc`);
+    let inc = 0, exp = 0;
+    $("list").replaceChildren(...rows.map(r => {
+      r.type === "income" ? inc += +r.amount : exp += +r.amount;
+      const li = document.createElement("li");
+      const d = document.createElement("div");
+      d.textContent = (r.type === "income" ? "+" : "−") + "₹" + r.amount + "  " + (r.note || "");
+      d.className = r.type === "income" ? "pos" : "";
+      const s = document.createElement("small");
+      s.textContent = r.date + " · " + r.who;
+      d.append(s);
+      const b = document.createElement("button");
+      b.textContent = "✕";
+      b.onclick = async () => { if (confirm("Delete?")) { await api("?id=eq." + r.id, {method: "DELETE"}); load(); } };
+      li.append(d, b);
+      return li;
+    }));
+    $("inc").textContent = inc; $("exp").textContent = exp;
+    const bal = inc - exp;
+    $("bal").textContent = "₹" + bal;
+    $("bal").className = bal < 0 ? "neg" : "pos";
+    $("err").textContent = "";
+  } catch (e) {
+    if (["400", "401", "403"].includes(e.message)) return logout(); // expired/invalid session
+    $("err").textContent = "Load failed: " + e.message + " (check URL/key/table)";
+  }
+}
+
+$("f").onsubmit = async e => {
+  e.preventDefault();
+  try {
+    await api("", {method: "POST", headers: {Prefer: "return=minimal"}, body: JSON.stringify({
+      date: $("date").value, type: $("type").value, amount: +$("amount").value,
+      who: $("who").value, note: $("note").value.trim()})});
+    $("amount").value = ""; $("note").value = "";
+    load();
+  } catch (e) { $("err").textContent = "Save failed: " + e.message; }
+};
+
+if (S) { show(true); load(); } else show(false);
+setInterval(() => S && load(), 30000); // pick up the other person's entries
+</script>
+</body>
+</html>
