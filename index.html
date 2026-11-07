@@ -67,12 +67,17 @@
     padding:16px 16px max(16px,env(safe-area-inset-bottom));z-index:21;max-height:calc(var(--vh,100vh) - 16px);overflow:auto;
     transform:translateY(100%);visibility:hidden;transition:transform .2s,visibility 0s .2s}
   #sheet.open{transform:none;visibility:visible;transition:transform .2s,visibility 0s}
-  #sheet.qm #type,#sheet.qm #who,#sheet.qm #dlink,#sheet.qm #qlabel{display:none}
+  .row3{display:flex;gap:6px}
+  .row3 select{flex:1;padding:12px 4px 12px 8px}
+  #sheet.qm #type,#sheet.qm #who,#sheet.qm #dlink{display:none}
   .sh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:1.1em}
   form{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--card);padding:12px;border-radius:14px}
   .full{grid-column:1/-1}
   #amount{font-size:24px;font-weight:600}
-  #dlink{padding:4px 2px}
+  .dnrow{display:flex;gap:8px;align-items:center}
+  .dnrow #note{flex:1}
+  #dlink{flex:none;white-space:nowrap;padding:12px 4px}
+  #date{flex:none;width:150px}
   /* loader */
   #bar{position:fixed;top:0;left:0;height:4px;width:100%;background:linear-gradient(90deg,transparent,var(--btn),transparent);
     background-size:40% 100%;background-repeat:no-repeat;animation:slide 1s linear infinite;opacity:0;transition:opacity .15s;z-index:40}
@@ -137,14 +142,16 @@
     <div class="sh"><b id="stitle">Add entry</b><button type="button" id="sclose" class="chip" aria-label="Close">✕</button></div>
     <form id="f">
       <input class="full" type="number" id="amount" inputmode="decimal" placeholder="Amount ₹" min="0.01" step="any" required>
-      <select id="type"><option value="expense">Expense</option><option value="income">Income</option></select>
-      <select id="who"></select>
-      <select class="full" id="cat" aria-label="Category"></select>
-      <input class="full" id="note" placeholder="Note (optional)" enterkeyhint="done">
-      <a href="#" class="full" id="dlink">📅 Today · change date</a>
-      <input class="full" type="date" id="date" required hidden>
-      <label class="full chk" id="qlabel"><input type="checkbox" id="qsave"> ⭐ Also add as a quick-add button</label>
-      <button class="full" id="go">Add</button>
+      <div class="full row3">
+        <select id="type" aria-label="Type"><option value="expense">Expense</option><option value="income">Income</option></select>
+        <select id="who" aria-label="Who"></select>
+        <select id="cat" aria-label="Category"></select>
+      </div>
+      <div class="full dnrow">
+        <input id="note" placeholder="Note (optional)" enterkeyhint="done">
+        <a href="#" id="dlink">📅 Today</a>
+        <input type="date" id="date" required hidden>
+      </div>      <button class="full" id="go">Add</button>
     </form>
     <div id="hist" hidden></div>
   </div>
@@ -269,9 +276,7 @@ $("prev").onclick = () => shift(-1);
 $("next").onclick = () => shift(1);
 
 $("cat").replaceChildren(...CATS.map(c => new Option(c)));
-const syncType = () => { // income has no category; quick-add option only for new expenses
-  $("cat").hidden = $("type").value === "income"; $("qlabel").hidden = $("cat").hidden || !!editId;
-};
+const syncType = () => $("cat").hidden = $("type").value === "income"; // income has no category
 $("type").onchange = syncType;
 
 // date row is hidden: entries default to today, "change date" reveals the picker
@@ -281,7 +286,7 @@ $("dlink").onclick = e => { e.preventDefault(); showDate(true); $("date").focus(
 function resetForm() {
   editId = null; qMode = false; $("sheet").classList.remove("qm");
   $("go").textContent = "Add"; $("stitle").textContent = "Add entry"; $("hist").hidden = true;
-  $("amount").value = ""; $("note").value = ""; $("qsave").checked = false; $("date").value = today; showDate(false); syncType();
+  $("amount").value = ""; $("note").value = ""; $("date").value = today; showDate(false); syncType();
 }
 function openSheet() { $("ov").hidden = false; $("sheet").classList.add("open"); $("amount").focus(); } // amount focused: keypad opens at once
 function closeSheet() { $("sheet").classList.remove("open"); $("ov").hidden = true; resetForm(); document.activeElement.blur(); }
@@ -329,18 +334,10 @@ $("f").onsubmit = async e => {
     who: $("who").value, note: $("note").value.trim(), category: $("type").value === "expense" ? $("cat").value : null};
   try {
     await spin(async () => {
-      let ok = true, qerr = false;
+      let ok = true;
       if (editId) { await api("?id=eq." + editId, {method: "PATCH", headers: {Prefer: "return=minimal"}, body: JSON.stringify(o)}); closeSheet(); }
-      else {
-        ok = await addEntry(o);
-        if (ok && $("qsave").checked && o.type === "expense") { // remember this entry as a one-tap button
-          try { await api("", {method: "POST", headers: {Prefer: "return=minimal"},
-            body: JSON.stringify({note: o.note, category: o.category, amount: o.amount})}, "quick_adds"); } catch (e) { qerr = true; }
-        }
-        $("amount").value = ""; $("note").value = ""; $("qsave").checked = false; $("amount").focus(); // stay open: add several in a row
-      }
-      buzz(); toast(!ok ? "Saved offline, will sync" : qerr ? "Saved ✓ but quick-add failed (run the quick_adds SQL)"
-        : editId ? "Saved ✓" : "Saved ✓  add another, or close");
+      else { ok = await addEntry(o); $("amount").value = ""; $("note").value = ""; $("amount").focus(); } // stay open: add several in a row
+      buzz(); toast(!ok ? "Saved offline, will sync" : editId ? "Saved ✓" : "Saved ✓  add another, or close");
       if (ok) await load();
     });
   } catch (e) { toast(errMsg(e)); }
