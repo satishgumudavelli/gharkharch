@@ -27,6 +27,10 @@
   .neg{color:var(--red)}.pos{color:var(--grn)}
   #warn,#pend{background:var(--red);color:#fff;border-radius:10px;padding:8px;text-align:center;margin-bottom:8px}
   #pend{background:#b36b00}
+  #nudge{background:var(--card);border:1px solid var(--btn);border-radius:10px;padding:8px;text-align:center;margin-bottom:8px}
+  .tag{color:var(--btn);margin-left:6px;cursor:pointer}
+  #hist{margin-top:10px;font-size:.85em;color:var(--mut);line-height:1.5}
+  #hist div{border-top:1px solid var(--bd);padding:4px 0}
   .stats{display:flex;justify-content:center;gap:8px;margin:10px 0 4px}
   .stats div{flex:1;background:var(--bg);border-radius:10px;padding:8px 4px;color:var(--mut);font-size:.85em}
   .stats strong{display:block;color:var(--fg);font-size:1.15em}
@@ -99,6 +103,7 @@
   </div>
   <div id="warn" hidden></div>
   <div id="pend" hidden></div>
+  <div id="nudge" hidden>📝 Nothing logged today yet. Tap + to add.</div>
   <div class="card">Remaining<b id="bal">₹0</b>
     <div class="stats">
       <div>Income<strong>₹<span id="inc">0</span></strong></div>
@@ -122,7 +127,8 @@
   </div>
   <div id="fsum"></div>
   <ul id="list"></ul>
-  <p style="text-align:center"><a href="#" id="csv">Export CSV</a> · <a href="#" id="big">A+ Bigger text</a> · <a href="#" id="lock">Lock</a></p>
+  <p style="text-align:center;line-height:2"><a href="#" id="share">Share summary</a> · <a href="#" id="remind">Daily reminder</a> · <a href="#" id="csv">Export CSV</a><br>
+    <a href="#" id="big">A+ Bigger text</a> · <a href="#" id="lock">Lock</a></p>
 
   <button id="fab" aria-label="Add entry">+</button>
   <div id="ov" hidden></div>
@@ -133,11 +139,13 @@
       <select id="type"><option value="expense">Expense</option><option value="income">Income</option></select>
       <select id="who"></select>
       <div class="full" id="cats"></div>
-      <input class="full" id="note" placeholder="Note (optional)" enterkeyhint="done">
+      <input class="full" id="note" placeholder="Note (optional)">
+      <input class="full" id="tags" placeholder="Tags (optional): festival guest" autocapitalize="none" enterkeyhint="done">
       <a href="#" class="full" id="dlink">📅 Today · change date</a>
       <input class="full" type="date" id="date" required hidden>
       <button class="full" id="go">Add</button>
     </form>
+    <div id="hist" hidden></div>
   </div>
 </div>
 
@@ -148,6 +156,7 @@ const EMAIL = "satish29g1993@gmail.com"; // shared Supabase Auth user; PIN = its
 const NAMES = ["Satish", "Ankita"];       // edit to your real names
 const CATS  = ["Groceries", "Vegetables", "Milk", "Fuel", "Medical", "Bills", "Other"];
 const LOW   = 200;                       // warn when remaining drops below this
+const REMIND_HOUR = 20;                  // 8pm: daily reminder time, and when the "nothing logged today" nudge starts
 let budgets = {}; // category -> monthly ₹ limit, loaded from the `budgets` table
 
 const $ = id => document.getElementById(id);
@@ -180,7 +189,7 @@ const buzz = () => { navigator.vibrate?.(15); hap.click(); };
 if (localStorage.big) document.body.classList.add("big");
 $("big").onclick = e => { e.preventDefault(); localStorage.big = document.body.classList.toggle("big") ? "1" : ""; };
 
-let S = null, rows = [], editId = null, cat = CATS[0];
+let S = null, rows = [], summary = null, editId = null, cat = CATS[0];
 try { S = JSON.parse(localStorage.gk); } catch (e) {}
 
 // --- iOS home-screen icon (drawn at runtime, no image file needed)
@@ -265,8 +274,8 @@ const showDate = on => { $("date").hidden = !on; $("dlink").hidden = on; };
 $("dlink").onclick = e => { e.preventDefault(); showDate(true); $("date").focus(); };
 
 function resetForm() {
-  editId = null; $("go").textContent = "Add"; $("stitle").textContent = "Add entry";
-  $("amount").value = ""; $("note").value = ""; $("date").value = today; showDate(false);
+  editId = null; $("go").textContent = "Add"; $("stitle").textContent = "Add entry"; $("hist").hidden = true;
+  $("amount").value = ""; $("note").value = ""; $("tags").value = ""; $("date").value = today; showDate(false);
 }
 function openSheet() { $("ov").hidden = false; $("sheet").classList.add("open"); $("amount").focus(); } // amount focused: keypad opens at once
 function closeSheet() { $("sheet").classList.remove("open"); $("ov").hidden = true; resetForm(); document.activeElement.blur(); }
@@ -278,22 +287,37 @@ function startEdit(r) {
   editId = r.id;
   if (![...$("who").options].some(o => o.value === r.who)) $("who").add(new Option(r.who));
   $("date").value = r.date; $("type").value = r.type; $("amount").value = r.amount;
-  $("who").value = r.who; $("note").value = r.note || "";
+  $("who").value = r.who; $("note").value = r.note || ""; $("tags").value = (r.tags || []).join(" ");
   if (r.category) { cat = r.category; drawCats(); }
   $("cats").hidden = r.type === "income"; showDate(r.date !== today);
   $("go").textContent = "Save changes"; $("stitle").textContent = "Edit entry";
-  openSheet();
+  openSheet(); showHist(r);
+}
+
+// edit history: when added, plus the old values saved by the DB trigger on every edit
+const when = t => new Date(t).toLocaleString("en-IN", {day: "numeric", month: "short", hour: "numeric", minute: "2-digit"});
+async function showHist(r) {
+  const h = $("hist"); h.hidden = true;
+  try {
+    const log = await api(`?entry_id=eq.${r.id}&order=at.desc`, {}, "entry_log");
+    if (editId !== r.id) return; // sheet moved on while loading
+    const lines = log.map(l => `${when(l.at)}: was ₹${fmt(l.old.amount)} · ${l.old.who} · ${l.old.date}${l.old.category ? " · " + l.old.category : ""}${l.old.note ? " · " + l.old.note : ""}`);
+    if (r.created_at) lines.push("Added " + when(r.created_at));
+    h.replaceChildren(...(lines.length ? [Object.assign(document.createElement("b"), {textContent: "History"}), ...lines.map(t => Object.assign(document.createElement("div"), {textContent: t}))] : []));
+    h.hidden = !lines.length;
+  } catch (e) {}
 }
 
 $("f").onsubmit = async e => {
   e.preventDefault();
   const o = {date: $("date").value, type: $("type").value, amount: +$("amount").value,
-    who: $("who").value, note: $("note").value.trim(), category: $("type").value === "expense" ? cat : null};
+    who: $("who").value, note: $("note").value.trim(), category: $("type").value === "expense" ? cat : null,
+    tags: $("tags").value.split(/[\s,#]+/).filter(Boolean).map(t => t.toLowerCase())};
   try {
     await spin(async () => {
       let ok = true;
       if (editId) { await api("?id=eq." + editId, {method: "PATCH", headers: {Prefer: "return=minimal"}, body: JSON.stringify(o)}); closeSheet(); }
-      else { ok = await addEntry(o); $("amount").value = ""; $("note").value = ""; $("amount").focus(); } // stay open: add several in a row
+      else { ok = await addEntry(o); $("amount").value = ""; $("note").value = ""; $("tags").value = ""; $("amount").focus(); } // stay open: add several in a row
       buzz(); toast(ok ? (editId ? "Saved ✓" : "Saved ✓  add another, or close") : "Saved offline, will sync");
       if (ok) await load();
     });
@@ -306,7 +330,7 @@ async function del(r) {
     await spin(async () => { await api("?id=eq." + r.id, {method: "DELETE"}); await load(); });
     buzz();
     toast(`Deleted ₹${fmt(r.amount)} ${r.note || r.category || ""}`,
-      () => addEntry({date: r.date, type: r.type, amount: r.amount, who: r.who, note: r.note, category: r.category}));
+      () => addEntry({date: r.date, type: r.type, amount: r.amount, who: r.who, note: r.note, category: r.category, tags: r.tags || []}));
   } catch (e) { toast(errMsg(e)); }
 }
 
@@ -338,6 +362,8 @@ async function load() {
     const dayNo = cur ? +today.slice(8) : days, left = days - dayNo + 1;
     $("pace").textContent = `Spending ₹${fmt(Math.round(exp / dayNo))}/day` +
       (cur && bal > 0 ? ` · ₹${fmt(Math.floor(bal / left))}/day for ${left} days left` : "");
+    summary = {m, inc, exp, carry, bal, by, who};
+    $("nudge").hidden = !(cur && new Date().getHours() >= REMIND_HOUR && !rows.some(r => r.date === today));
     drawBrk(by); drawQuick(recent); render();
     $("err").textContent = "";
   } catch (e) {
@@ -388,7 +414,7 @@ const dayLabel = d => d === today ? "Today" : d === new Date(Date.now() - 864e5)
 function render() { // list only: filters apply here, month totals above stay for the whole month
   const q = $("q").value.trim().toLowerCase(), fw = $("fwho").value, fc = $("fcat").value, filtered = q || fw || fc;
   const shown = rows.filter(r => (!fw || r.who === fw) && (!fc || (r.type === "expense" && (r.category || "Other") === fc)) &&
-    (!q || [r.note, r.category, r.who, r.amount].join(" ").toLowerCase().includes(q)));
+    (!q || [r.note, r.category, r.who, r.amount, ...(r.tags || []).map(t => "#" + t)].join(" ").toLowerCase().includes(q)));
   const dayExp = {}; let e = 0, i = 0;
   for (const r of shown) r.type === "expense" ? (e += +r.amount, dayExp[r.date] = (dayExp[r.date] || 0) + +r.amount) : i += +r.amount;
   $("fsum").textContent = filtered ? `${shown.length} shown · spent ₹${fmt(e)}` + (i ? ` · income ₹${fmt(i)}` : "") : "";
@@ -405,6 +431,11 @@ function render() { // list only: filters apply here, month totals above stay fo
     d.textContent = (inc ? "+" : "−") + "₹" + fmt(r.amount) + "  " + (r.note || (inc ? "" : r.category || ""));
     if (inc) d.classList.add("pos");
     s.textContent = [r.who, !inc && r.note && r.category].filter(Boolean).join(" · ");
+    for (const t of r.tags || []) { // tap a tag to search it; the "shown · spent" line then totals that tag
+      const a = document.createElement("span"); a.className = "tag"; a.textContent = "#" + t;
+      a.onclick = ev => { ev.stopPropagation(); $("q").value = "#" + t; render(); scrollTo(0, 0); };
+      s.append(a);
+    }
     d.append(s);
     const b = document.createElement("button");
     b.className = "del"; b.textContent = "✕"; b.setAttribute("aria-label", "Delete"); b.onclick = () => del(r);
@@ -463,10 +494,35 @@ $("q").oninput = $("fwho").onchange = $("fcat").onchange = render;
 $("csv").onclick = e => {
   e.preventDefault();
   const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const csv = "date,type,amount,who,category,note\n" + rows.map(r => [r.date, r.type, r.amount, r.who, r.category, r.note].map(q).join(",")).join("\n");
+  const csv = "date,type,amount,who,category,note,tags\n" + rows.map(r => [r.date, r.type, r.amount, r.who, r.category, r.note, (r.tags || []).join(" ")].map(q).join(",")).join("\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], {type: "text/csv"}));
   a.download = `gharkharch-${$("month").value}.csv`; a.click();
+};
+
+// share the month's summary through the phone's share sheet (WhatsApp link if the browser has none)
+$("share").onclick = async e => {
+  e.preventDefault();
+  if (!summary) return;
+  const s = summary, top = Object.entries(s.by).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([c, v]) => `${c} ₹${fmt(v)}`).join(", ");
+  const text = `Gharkharch · ${new Date(s.m + "-01T00:00").toLocaleDateString("en-IN", {month: "long", year: "numeric"})}\n` +
+    `Income ₹${fmt(s.inc)}` + (s.carry ? ` (+ ₹${fmt(s.carry)} carried)` : "") + `\nSpent ₹${fmt(s.exp)}\nLeft ₹${fmt(s.bal)}` +
+    (top ? `\nTop: ${top}` : "") + (s.exp ? `\nSpent by ${Object.entries(s.who).map(([n, v]) => `${n} ₹${fmt(v)}`).join(", ")}` : "");
+  try { navigator.share ? await navigator.share({text}) : open("https://wa.me/?text=" + encodeURIComponent(text)); } catch (e) {} // cancel = AbortError
+};
+
+// daily reminder: a repeating calendar event with an alert; the phone's Calendar does the notifying
+$("remind").onclick = e => {
+  e.preventDefault();
+  const stamp = new Date().toISOString().replace(/[-:]|\.\d+/g, ""), hh = String(REMIND_HOUR).padStart(2, "0");
+  const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//gharkharch//EN", "BEGIN:VEVENT", "UID:gharkharch-daily@gharkharch",
+    `DTSTAMP:${stamp}`, `DTSTART:${today.replaceAll("-", "")}T${hh}0000`, "DURATION:PT15M", "RRULE:FREQ=DAILY",
+    "SUMMARY:Log today's expenses (Gharkharch)", `DESCRIPTION:${location.href.split("#")[0]}`,
+    "BEGIN:VALARM", "TRIGGER:PT0M", "ACTION:DISPLAY", "DESCRIPTION:Log today's expenses", "END:VALARM", "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([ics], {type: "text/calendar"}));
+  a.download = "gharkharch-reminder.ics"; a.click();
+  toast(`Open the file to add a daily ${REMIND_HOUR % 12 || 12}${REMIND_HOUR < 12 ? "am" : "pm"} reminder`);
 };
 
 if (S) { show(true); spin(load); } else show(false);
