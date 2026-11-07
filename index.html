@@ -28,7 +28,8 @@
   #warn,#pend{background:var(--red);color:#fff;border-radius:10px;padding:8px;text-align:center;margin-bottom:8px}
   #pend{background:#b36b00}
   #nudge{background:var(--card);border:1px solid var(--btn);border-radius:10px;padding:8px;text-align:center;margin-bottom:8px}
-  .tag{color:var(--btn);margin-left:6px;cursor:pointer}
+  input[type=checkbox]{width:22px;height:22px;min-height:0;padding:0;margin:0;flex:none;accent-color:var(--btn)}
+  label.chk{display:flex;align-items:center;gap:10px;padding:4px 2px;cursor:pointer}
   #hist{margin-top:10px;font-size:.85em;color:var(--mut);line-height:1.5}
   #hist div{border-top:1px solid var(--bd);padding:4px 0}
   .stats{display:flex;justify-content:center;gap:8px;margin:10px 0 4px}
@@ -62,15 +63,15 @@
   #fab{position:fixed;right:max(16px,env(safe-area-inset-right));bottom:max(20px,env(safe-area-inset-bottom));width:60px;height:60px;
     border-radius:30px;font-size:2em;line-height:1;padding:0;box-shadow:0 4px 14px #0006;z-index:5}
   #ov{position:fixed;inset:0;background:#0007;z-index:20}
-  #sheet{position:fixed;left:0;right:0;bottom:0;max-width:480px;margin:0 auto;background:var(--bg);border-radius:18px 18px 0 0;
-    padding:16px 16px max(16px,env(safe-area-inset-bottom));z-index:21;max-height:92vh;overflow:auto;
+  #sheet{position:fixed;left:0;right:0;bottom:var(--kb,0px);max-width:480px;margin:0 auto;background:var(--bg);border-radius:18px 18px 0 0;
+    padding:16px 16px max(16px,env(safe-area-inset-bottom));z-index:21;max-height:calc(var(--vh,100vh) - 16px);overflow:auto;
     transform:translateY(100%);visibility:hidden;transition:transform .2s,visibility 0s .2s}
   #sheet.open{transform:none;visibility:visible;transition:transform .2s,visibility 0s}
+  #sheet.qm #type,#sheet.qm #who,#sheet.qm #dlink,#sheet.qm #qlabel{display:none}
   .sh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:1.1em}
   form{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--card);padding:12px;border-radius:14px}
   .full{grid-column:1/-1}
   #amount{font-size:24px;font-weight:600}
-  #cats{display:flex;flex-wrap:wrap;gap:6px}
   #dlink{padding:4px 2px}
   /* loader */
   #bar{position:fixed;top:0;left:0;height:4px;width:100%;background:linear-gradient(90deg,transparent,var(--btn),transparent);
@@ -138,11 +139,11 @@
       <input class="full" type="number" id="amount" inputmode="decimal" placeholder="Amount ₹" min="0.01" step="any" required>
       <select id="type"><option value="expense">Expense</option><option value="income">Income</option></select>
       <select id="who"></select>
-      <div class="full" id="cats"></div>
-      <input class="full" id="note" placeholder="Note (optional)">
-      <input class="full" id="tags" placeholder="Tags (optional): festival guest" autocapitalize="none" enterkeyhint="done">
+      <select class="full" id="cat" aria-label="Category"></select>
+      <input class="full" id="note" placeholder="Note (optional)" enterkeyhint="done">
       <a href="#" class="full" id="dlink">📅 Today · change date</a>
       <input class="full" type="date" id="date" required hidden>
+      <label class="full chk" id="qlabel"><input type="checkbox" id="qsave"> ⭐ Also add as a quick-add button</label>
       <button class="full" id="go">Add</button>
     </form>
     <div id="hist" hidden></div>
@@ -189,7 +190,16 @@ const buzz = () => { navigator.vibrate?.(15); hap.click(); };
 if (localStorage.big) document.body.classList.add("big");
 $("big").onclick = e => { e.preventDefault(); localStorage.big = document.body.classList.toggle("big") ? "1" : ""; };
 
-let S = null, rows = [], summary = null, editId = null, cat = CATS[0];
+let S = null, rows = [], summary = null, editId = null, qEdit = false, qMode = false;
+
+// keep the add sheet above the iOS keyboard instead of letting the page scroll its fields out of view
+const vv = window.visualViewport;
+const fit = () => {
+  const r = document.documentElement.style;
+  r.setProperty("--kb", Math.max(0, innerHeight - vv.height - vv.offsetTop) + "px");
+  r.setProperty("--vh", vv.height + "px");
+};
+if (vv) { vv.addEventListener("resize", fit); vv.addEventListener("scroll", fit); fit(); }
 try { S = JSON.parse(localStorage.gk); } catch (e) {}
 
 // --- iOS home-screen icon (drawn at runtime, no image file needed)
@@ -258,24 +268,20 @@ const shift = n => { // move month by n (Date handles year rollover)
 $("prev").onclick = () => shift(-1);
 $("next").onclick = () => shift(1);
 
-function drawCats() {
-  $("cats").replaceChildren(...CATS.map(c => {
-    const b = document.createElement("button");
-    b.type = "button"; b.textContent = c; b.className = "chip" + (c === cat ? " on" : "");
-    b.onclick = () => { cat = c; drawCats(); };
-    return b;
-  }));
-}
-drawCats();
-$("type").onchange = () => $("cats").hidden = $("type").value === "income";
+$("cat").replaceChildren(...CATS.map(c => new Option(c)));
+const syncType = () => { // income has no category; quick-add option only for new expenses
+  $("cat").hidden = $("type").value === "income"; $("qlabel").hidden = $("cat").hidden || !!editId;
+};
+$("type").onchange = syncType;
 
 // date row is hidden: entries default to today, "change date" reveals the picker
 const showDate = on => { $("date").hidden = !on; $("dlink").hidden = on; };
 $("dlink").onclick = e => { e.preventDefault(); showDate(true); $("date").focus(); };
 
 function resetForm() {
-  editId = null; $("go").textContent = "Add"; $("stitle").textContent = "Add entry"; $("hist").hidden = true;
-  $("amount").value = ""; $("note").value = ""; $("tags").value = ""; $("date").value = today; showDate(false);
+  editId = null; qMode = false; $("sheet").classList.remove("qm");
+  $("go").textContent = "Add"; $("stitle").textContent = "Add entry"; $("hist").hidden = true;
+  $("amount").value = ""; $("note").value = ""; $("qsave").checked = false; $("date").value = today; showDate(false); syncType();
 }
 function openSheet() { $("ov").hidden = false; $("sheet").classList.add("open"); $("amount").focus(); } // amount focused: keypad opens at once
 function closeSheet() { $("sheet").classList.remove("open"); $("ov").hidden = true; resetForm(); document.activeElement.blur(); }
@@ -287,9 +293,8 @@ function startEdit(r) {
   editId = r.id;
   if (![...$("who").options].some(o => o.value === r.who)) $("who").add(new Option(r.who));
   $("date").value = r.date; $("type").value = r.type; $("amount").value = r.amount;
-  $("who").value = r.who; $("note").value = r.note || ""; $("tags").value = (r.tags || []).join(" ");
-  if (r.category) { cat = r.category; drawCats(); }
-  $("cats").hidden = r.type === "income"; showDate(r.date !== today);
+  $("who").value = r.who; $("note").value = r.note || ""; $("cat").value = r.category || "Other";
+  syncType(); showDate(r.date !== today);
   $("go").textContent = "Save changes"; $("stitle").textContent = "Edit entry";
   openSheet(); showHist(r);
 }
@@ -310,15 +315,32 @@ async function showHist(r) {
 
 $("f").onsubmit = async e => {
   e.preventDefault();
+  if (qMode) { // save a quick-add button only
+    try {
+      await spin(async () => {
+        await api("", {method: "POST", headers: {Prefer: "return=minimal"},
+          body: JSON.stringify({note: $("note").value.trim(), category: $("cat").value, amount: +$("amount").value})}, "quick_adds");
+        closeSheet(); buzz(); toast("Quick-add saved ✓"); await load();
+      });
+    } catch (e) { toast(errMsg(e)); }
+    return;
+  }
   const o = {date: $("date").value, type: $("type").value, amount: +$("amount").value,
-    who: $("who").value, note: $("note").value.trim(), category: $("type").value === "expense" ? cat : null,
-    tags: $("tags").value.split(/[\s,#]+/).filter(Boolean).map(t => t.toLowerCase())};
+    who: $("who").value, note: $("note").value.trim(), category: $("type").value === "expense" ? $("cat").value : null};
   try {
     await spin(async () => {
-      let ok = true;
+      let ok = true, qerr = false;
       if (editId) { await api("?id=eq." + editId, {method: "PATCH", headers: {Prefer: "return=minimal"}, body: JSON.stringify(o)}); closeSheet(); }
-      else { ok = await addEntry(o); $("amount").value = ""; $("note").value = ""; $("tags").value = ""; $("amount").focus(); } // stay open: add several in a row
-      buzz(); toast(ok ? (editId ? "Saved ✓" : "Saved ✓  add another, or close") : "Saved offline, will sync");
+      else {
+        ok = await addEntry(o);
+        if (ok && $("qsave").checked && o.type === "expense") { // remember this entry as a one-tap button
+          try { await api("", {method: "POST", headers: {Prefer: "return=minimal"},
+            body: JSON.stringify({note: o.note, category: o.category, amount: o.amount})}, "quick_adds"); } catch (e) { qerr = true; }
+        }
+        $("amount").value = ""; $("note").value = ""; $("qsave").checked = false; $("amount").focus(); // stay open: add several in a row
+      }
+      buzz(); toast(!ok ? "Saved offline, will sync" : qerr ? "Saved ✓ but quick-add failed (run the quick_adds SQL)"
+        : editId ? "Saved ✓" : "Saved ✓  add another, or close");
       if (ok) await load();
     });
   } catch (e) { toast(errMsg(e)); }
@@ -330,7 +352,7 @@ async function del(r) {
     await spin(async () => { await api("?id=eq." + r.id, {method: "DELETE"}); await load(); });
     buzz();
     toast(`Deleted ₹${fmt(r.amount)} ${r.note || r.category || ""}`,
-      () => addEntry({date: r.date, type: r.type, amount: r.amount, who: r.who, note: r.note, category: r.category, tags: r.tags || []}));
+      () => addEntry({date: r.date, type: r.type, amount: r.amount, who: r.who, note: r.note, category: r.category}));
   } catch (e) { toast(errMsg(e)); }
 }
 
@@ -344,7 +366,7 @@ async function load() {
     // leftover from all earlier months, summed in the DB (carry_before function): no row cap
     const carry = +await api("/carry_before", {method: "POST", body: JSON.stringify({d: start})}, "rpc");
     budgets = Object.fromEntries((await api("?select=*", {}, "budgets")).map(x => [x.category, +x.amount]));
-    const recent = await api("?select=amount,note,category&type=eq.expense&order=id.desc&limit=200");
+    const quick = await api("?select=*&order=id", {}, "quick_adds");
 
     let inc = 0, exp = 0; const by = {}, who = {};
     for (const r of rows) {
@@ -364,7 +386,7 @@ async function load() {
       (cur && bal > 0 ? ` · ₹${fmt(Math.floor(bal / left))}/day for ${left} days left` : "");
     summary = {m, inc, exp, carry, bal, by, who};
     $("nudge").hidden = !(cur && new Date().getHours() >= REMIND_HOUR && !rows.some(r => r.date === today));
-    drawBrk(by); drawQuick(recent); render();
+    drawBrk(by); drawQuick(quick); render();
     $("err").textContent = "";
   } catch (e) {
     if (["400", "401", "403"].includes(e.message)) return logout(); // expired session / failed refresh
@@ -372,24 +394,31 @@ async function load() {
   }
 }
 
-// quick-add: your most repeated expenses (same note/category + amount, seen 2+ times), one tap saves for today
-function drawQuick(recent) {
-  const n = {};
-  for (const r of recent) { const k = [r.note || "", r.category || "Other", +r.amount].join("|"); n[k] = (n[k] || 0) + 1; }
-  const top = Object.entries(n).filter(([, c]) => c > 1).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k]) => k.split("|"));
-  $("quick").hidden = !top.length;
-  $("quick").replaceChildren(...top.map(([note, category, amount]) => {
-    const b = document.createElement("button");
-    b.className = "chip"; b.textContent = `${note || category} ₹${fmt(amount)}`;
-    b.onclick = async () => {
-      try {
-        const ok = await spin(() => addEntry({date: today, type: "expense", amount: +amount, who: $("who").value, note, category}));
-        buzz(); toast(ok ? `Saved ✓ ${b.textContent}` : "Saved offline, will sync");
-        if (ok) spin(load);
-      } catch (e) { toast(errMsg(e)); }
-    };
-    return b;
-  }));
+// quick-add buttons live in the `quick_adds` table. Tap one = saves that expense for today.
+// "＋ New" creates one; "✎" switches to delete mode.
+let quickList = [];
+function drawQuick(list = quickList) {
+  quickList = list;
+  const chip = (text, fn, cls = "chip") => { const b = document.createElement("button"); b.className = cls; b.textContent = text; b.onclick = fn; return b; };
+  const items = list.map(q => {
+    const label = `${q.note || q.category || "Other"} ₹${fmt(q.amount)}`;
+    return qEdit
+      ? chip("✕ " + label, () => spin(async () => { try { await api("?id=eq." + q.id, {method: "DELETE"}, "quick_adds"); await load(); } catch (e) { toast(errMsg(e)); } }))
+      : chip(label, async () => {
+        try {
+          const ok = await spin(() => addEntry({date: today, type: "expense", amount: +q.amount, who: $("who").value, note: q.note || "", category: q.category}));
+          buzz(); toast(ok ? `Saved ✓ ${label}` : "Saved offline, will sync");
+          if (ok) spin(load);
+        } catch (e) { toast(errMsg(e)); }
+      });
+  });
+  $("quick").replaceChildren(...items,
+    chip("＋ New", newQuick), ...(list.length ? [chip(qEdit ? "Done" : "✎", () => { qEdit = !qEdit; drawQuick(); })] : []));
+  $("quick").hidden = false;
+}
+function newQuick() { // the sheet in "quick-add only" mode: amount, category, note; nothing is logged now
+  resetForm(); qMode = true; $("sheet").classList.add("qm"); $("type").value = "expense"; syncType();
+  $("stitle").textContent = "New quick-add"; $("go").textContent = "Save quick-add"; openSheet();
 }
 
 // category bars; bar = spent vs budget (red when over), or vs biggest category if no budget. Tap a row to filter.
@@ -414,7 +443,7 @@ const dayLabel = d => d === today ? "Today" : d === new Date(Date.now() - 864e5)
 function render() { // list only: filters apply here, month totals above stay for the whole month
   const q = $("q").value.trim().toLowerCase(), fw = $("fwho").value, fc = $("fcat").value, filtered = q || fw || fc;
   const shown = rows.filter(r => (!fw || r.who === fw) && (!fc || (r.type === "expense" && (r.category || "Other") === fc)) &&
-    (!q || [r.note, r.category, r.who, r.amount, ...(r.tags || []).map(t => "#" + t)].join(" ").toLowerCase().includes(q)));
+    (!q || [r.note, r.category, r.who, r.amount].join(" ").toLowerCase().includes(q)));
   const dayExp = {}; let e = 0, i = 0;
   for (const r of shown) r.type === "expense" ? (e += +r.amount, dayExp[r.date] = (dayExp[r.date] || 0) + +r.amount) : i += +r.amount;
   $("fsum").textContent = filtered ? `${shown.length} shown · spent ₹${fmt(e)}` + (i ? ` · income ₹${fmt(i)}` : "") : "";
@@ -431,11 +460,6 @@ function render() { // list only: filters apply here, month totals above stay fo
     d.textContent = (inc ? "+" : "−") + "₹" + fmt(r.amount) + "  " + (r.note || (inc ? "" : r.category || ""));
     if (inc) d.classList.add("pos");
     s.textContent = [r.who, !inc && r.note && r.category].filter(Boolean).join(" · ");
-    for (const t of r.tags || []) { // tap a tag to search it; the "shown · spent" line then totals that tag
-      const a = document.createElement("span"); a.className = "tag"; a.textContent = "#" + t;
-      a.onclick = ev => { ev.stopPropagation(); $("q").value = "#" + t; render(); scrollTo(0, 0); };
-      s.append(a);
-    }
     d.append(s);
     const b = document.createElement("button");
     b.className = "del"; b.textContent = "✕"; b.setAttribute("aria-label", "Delete"); b.onclick = () => del(r);
@@ -494,7 +518,7 @@ $("q").oninput = $("fwho").onchange = $("fcat").onchange = render;
 $("csv").onclick = e => {
   e.preventDefault();
   const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const csv = "date,type,amount,who,category,note,tags\n" + rows.map(r => [r.date, r.type, r.amount, r.who, r.category, r.note, (r.tags || []).join(" ")].map(q).join(",")).join("\n");
+  const csv = "date,type,amount,who,category,note\n" + rows.map(r => [r.date, r.type, r.amount, r.who, r.category, r.note].map(q).join(",")).join("\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], {type: "text/csv"}));
   a.download = `gharkharch-${$("month").value}.csv`; a.click();
