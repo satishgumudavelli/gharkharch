@@ -15,58 +15,70 @@
   @media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--fg:#f2f2f7;--mut:#98989d;--bd:#3a3a3c;--red:#ff453a;--grn:#30d158}}
   *{box-sizing:border-box}
   body{font-family:-apple-system,system-ui,sans-serif;max-width:480px;margin:0 auto;background:var(--bg);color:var(--fg);
-    padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+    padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) calc(100px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+  body.big{zoom:1.2}
   input,select,button{font:inherit;font-size:16px;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--fg);min-height:44px}
+  input,select{width:100%;min-width:0}
   button{background:var(--btn);color:#fff;border:0;font-weight:600}
+  a{color:var(--mut)}
   .card{background:var(--card);border-radius:14px;padding:16px;text-align:center;margin-bottom:8px}
   .card b{font-size:2.6em;display:block}
   .card small{color:var(--mut);display:block;margin-top:4px}
   .neg{color:var(--red)}.pos{color:var(--grn)}
-  #warn{background:var(--red);color:#fff;border-radius:10px;padding:8px;text-align:center;margin-bottom:8px}
-  form{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
-  .full{grid-column:1/-1}
-  #cats{display:flex;flex-wrap:wrap;gap:6px}
-  .chip{background:var(--card);color:var(--fg);border:1px solid var(--bd);padding:8px 12px;min-height:36px;font-weight:400}
-  .chip.on{background:var(--btn);color:#fff;border-color:var(--btn)}
-  #cancel{background:var(--mut)}
-  ul{list-style:none;padding:0;margin:0}
-  li{background:var(--card);border-radius:10px;margin-bottom:6px;display:flex;align-items:center}
-  li .row{flex:1;padding:12px;cursor:pointer}
-  li small{color:var(--mut);display:block}
-  li .del{background:none;color:var(--red);font-size:1.3em;width:48px}
-  #err,#lerr{color:var(--red)}
-  #brk{color:var(--mut);font-size:.9em;margin:8px 0;text-align:center}
-  a{color:var(--mut)}
-  input[type=checkbox]{width:22px;height:22px;min-height:0;padding:0;margin:0;flex:none;accent-color:var(--btn)}
-  label.chk{display:flex;align-items:center;gap:10px;padding:10px 4px;cursor:pointer}
+  #warn,#pend{background:var(--red);color:#fff;border-radius:10px;padding:8px;text-align:center;margin-bottom:8px}
+  #pend{background:#b36b00}
   .stats{display:flex;justify-content:center;gap:8px;margin:10px 0 4px}
   .stats div{flex:1;background:var(--bg);border-radius:10px;padding:8px 4px;color:var(--mut);font-size:.85em}
   .stats strong{display:block;color:var(--fg);font-size:1.15em}
-  form{background:var(--card);padding:12px;border-radius:14px}
-  input,select{width:100%;min-width:0}
-  @media(min-width:600px){body{max-width:620px}.card b{font-size:3em}}
-  #bar{position:fixed;top:0;left:0;height:4px;width:100%;background:linear-gradient(90deg,transparent,var(--btn),transparent);
-    background-size:40% 100%;background-repeat:no-repeat;animation:slide 1s linear infinite;opacity:0;transition:opacity .15s;z-index:9}
-  @keyframes slide{from{background-position:-40% 0}to{background-position:140% 0}}
-  body.busy #bar{opacity:1}
-  body.busy{cursor:progress}
-  body.busy #list,body.busy .card{opacity:.5;transition:opacity .15s}
-  body.busy button{pointer-events:none}
-  #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:max(16px,env(safe-area-inset-bottom));background:var(--fg);color:var(--bg);
-    border-radius:12px;padding:8px 8px 8px 16px;display:flex;align-items:center;gap:12px;z-index:10;max-width:calc(100% - 32px)}
-  #toast button{padding:8px 14px;min-height:36px}
-  .filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 4px}
-  #q{grid-column:1/-1}
-  #fsum{color:var(--mut);font-size:.85em;margin:0 4px 6px}
+  .chip{background:var(--card);color:var(--fg);border:1px solid var(--bd);padding:8px 12px;min-height:36px;font-weight:400}
+  .chip.on{background:var(--btn);color:#fff;border-color:var(--btn)}
+  #quick{display:flex;gap:6px;overflow-x:auto;margin:0 0 8px;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+  #quick .chip{flex:none;white-space:nowrap}
   #brk{text-align:left;padding:12px 16px}
   .cr{display:grid;grid-template-columns:92px 1fr auto;gap:10px;align-items:center;font-size:.9em;margin:6px 0;cursor:pointer}
   .cr .t{background:var(--bd);border-radius:6px;height:10px;overflow:hidden}
   .cr i{display:block;height:100%;background:var(--btn);border-radius:6px}
   .cr i.over{background:var(--red)}
-  li.day{background:none;display:flex;justify-content:space-between;color:var(--mut);font-size:.85em;margin:12px 4px 4px}
-  li.empty{justify-content:center;padding:16px;color:var(--mut)}
   summary{cursor:pointer;color:var(--mut);padding:8px 4px}
   label.bg{display:grid;grid-template-columns:100px 1fr;gap:8px;align-items:center;margin:6px 0}
+  .filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 4px}
+  #q{grid-column:1/-1}
+  #fsum{color:var(--mut);font-size:.85em;margin:0 4px 6px}
+  ul{list-style:none;padding:0;margin:0}
+  li{background:var(--card);border-radius:10px;margin-bottom:6px;display:flex;align-items:center;overflow:hidden}
+  li.swiping{background:var(--red)}
+  li .row,li .del{background:var(--card);transition:transform .15s}
+  li .row{flex:1;padding:12px;cursor:pointer}
+  li small{color:var(--mut);display:block}
+  li .del{color:var(--red);font-size:1.3em;width:48px;align-self:stretch}
+  li.day{background:none;display:flex;justify-content:space-between;color:var(--mut);font-size:.85em;margin:12px 4px 4px}
+  li.empty{justify-content:center;padding:20px;color:var(--mut);text-align:center}
+  #err,#lerr{color:var(--red)}
+  /* add/edit sheet */
+  #fab{position:fixed;right:max(16px,env(safe-area-inset-right));bottom:max(20px,env(safe-area-inset-bottom));width:60px;height:60px;
+    border-radius:30px;font-size:2em;line-height:1;padding:0;box-shadow:0 4px 14px #0006;z-index:5}
+  #ov{position:fixed;inset:0;background:#0007;z-index:20}
+  #sheet{position:fixed;left:0;right:0;bottom:0;max-width:480px;margin:0 auto;background:var(--bg);border-radius:18px 18px 0 0;
+    padding:16px 16px max(16px,env(safe-area-inset-bottom));z-index:21;max-height:92vh;overflow:auto;
+    transform:translateY(100%);visibility:hidden;transition:transform .2s,visibility 0s .2s}
+  #sheet.open{transform:none;visibility:visible;transition:transform .2s,visibility 0s}
+  .sh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:1.1em}
+  form{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--card);padding:12px;border-radius:14px}
+  .full{grid-column:1/-1}
+  #amount{font-size:24px;font-weight:600}
+  #cats{display:flex;flex-wrap:wrap;gap:6px}
+  #dlink{padding:4px 2px}
+  /* loader */
+  #bar{position:fixed;top:0;left:0;height:4px;width:100%;background:linear-gradient(90deg,transparent,var(--btn),transparent);
+    background-size:40% 100%;background-repeat:no-repeat;animation:slide 1s linear infinite;opacity:0;transition:opacity .15s;z-index:40}
+  @keyframes slide{from{background-position:-40% 0}to{background-position:140% 0}}
+  body.busy #bar{opacity:1}
+  body.busy{cursor:progress}
+  body.busy #list,body.busy .card{opacity:.5;transition:opacity .15s}
+  body.busy button{pointer-events:none}
+  #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(max(20px,env(safe-area-inset-bottom)) + 70px);background:var(--fg);color:var(--bg);
+    border-radius:12px;padding:10px 10px 10px 16px;display:flex;align-items:center;gap:12px;z-index:30;max-width:calc(100% - 32px)}
+  #toast button{padding:8px 14px;min-height:36px}
   [hidden]{display:none!important}
 </style>
 </head>
@@ -86,6 +98,7 @@
     <button id="next" aria-label="Next month" style="width:52px;flex:none">▶</button>
   </div>
   <div id="warn" hidden></div>
+  <div id="pend" hidden></div>
   <div class="card">Remaining<b id="bal">₹0</b>
     <div class="stats">
       <div>Income<strong>₹<span id="inc">0</span></strong></div>
@@ -95,17 +108,7 @@
     <small id="pace"></small>
     <small id="people"></small>
   </div>
-
-  <form id="f">
-    <input type="date" id="date" required>
-    <select id="type"><option value="expense">Expense</option><option value="income">Income</option></select>
-    <input type="number" id="amount" inputmode="decimal" placeholder="Amount ₹" min="0.01" step="any" required>
-    <select id="who"></select>
-    <div class="full" id="cats"></div>
-    <input class="full" id="note" placeholder="Note (optional)" enterkeyhint="done">
-    <button class="full" id="go">Add</button>
-    <button type="button" class="full" id="cancel" hidden>Cancel edit</button>
-  </form>
+  <div id="quick" hidden></div>
   <div id="err"></div>
   <div id="brk" class="card" hidden></div>
   <details id="bd"><summary>Edit budgets</summary>
@@ -119,7 +122,23 @@
   </div>
   <div id="fsum"></div>
   <ul id="list"></ul>
-  <p style="text-align:center"><a href="#" id="csv">Export CSV</a> · <a href="#" id="lock">Lock</a></p>
+  <p style="text-align:center"><a href="#" id="csv">Export CSV</a> · <a href="#" id="big">A+ Bigger text</a> · <a href="#" id="lock">Lock</a></p>
+
+  <button id="fab" aria-label="Add entry">+</button>
+  <div id="ov" hidden></div>
+  <div id="sheet" role="dialog" aria-label="Add entry">
+    <div class="sh"><b id="stitle">Add entry</b><button type="button" id="sclose" class="chip" aria-label="Close">✕</button></div>
+    <form id="f">
+      <input class="full" type="number" id="amount" inputmode="decimal" placeholder="Amount ₹" min="0.01" step="any" required>
+      <select id="type"><option value="expense">Expense</option><option value="income">Income</option></select>
+      <select id="who"></select>
+      <div class="full" id="cats"></div>
+      <input class="full" id="note" placeholder="Note (optional)" enterkeyhint="done">
+      <a href="#" class="full" id="dlink">📅 Today · change date</a>
+      <input class="full" type="date" id="date" required hidden>
+      <button class="full" id="go">Add</button>
+    </form>
+  </div>
 </div>
 
 <script>
@@ -133,17 +152,34 @@ let budgets = {}; // category -> monthly ₹ limit, loaded from the `budgets` ta
 
 const $ = id => document.getElementById(id);
 const fmt = n => Number(n).toLocaleString("en-IN", {maximumFractionDigits: 2}); // 1,00,000 style
-let busyN = 0; // loader: top bar + dimmed card/list + buttons locked while a user action is running
+const errMsg = e => e instanceof TypeError || !navigator.onLine ? "No internet. Check your connection and try again."
+  : `Something went wrong (${e.message}). Please try again.`;
+
+// loader: top bar + dimmed card/list + buttons locked while a user action is running
+let busyN = 0;
 const spin = async f => {
   document.body.classList.add("busy"); busyN++;
   try { return await f(); } finally { if (!--busyN) document.body.classList.remove("busy"); }
 };
-let undoFn, toastT; // delete happens at once; the toast offers 6s to put it back
+
+// toast with optional Undo
+let undoFn, toastT;
 const toast = (msg, fn) => {
-  $("tmsg").textContent = msg; undoFn = fn; $("toast").hidden = false;
+  $("tmsg").textContent = msg; undoFn = fn; $("undo").hidden = !fn; $("toast").hidden = false;
   clearTimeout(toastT); toastT = setTimeout(() => $("toast").hidden = true, 6000);
 };
-$("undo").onclick = () => spin(async () => { $("toast").hidden = true; await undoFn(); await load(); });
+$("undo").onclick = () => spin(async () => { $("toast").hidden = true; try { await undoFn(); await load(); } catch (e) { toast(errMsg(e)); } });
+
+// haptics: Android vibrates; iOS 17.4+ ticks when a hidden switch input is toggled (best effort)
+const hap = document.createElement("label");
+hap.style.cssText = "position:fixed;left:-99px;opacity:0;pointer-events:none";
+hap.innerHTML = '<input type="checkbox" switch tabindex="-1">'; document.body.append(hap);
+const buzz = () => { navigator.vibrate?.(15); hap.click(); };
+
+// bigger text is a per-device choice, so it is the one setting kept on the phone
+if (localStorage.big) document.body.classList.add("big");
+$("big").onclick = e => { e.preventDefault(); localStorage.big = document.body.classList.toggle("big") ? "1" : ""; };
+
 let S = null, rows = [], editId = null, cat = CATS[0];
 try { S = JSON.parse(localStorage.gk); } catch (e) {}
 
@@ -168,7 +204,7 @@ $("lock").onclick = e => { e.preventDefault(); logout(); };
 $("login").onsubmit = async e => {
   e.preventDefault();
   try { await spin(() => auth("password", {email: EMAIL, password: $("pin").value})); $("pin").value = ""; $("lerr").textContent = ""; show(true); spin(load); }
-  catch (e) { $("lerr").textContent = "Wrong PIN"; }
+  catch (e) { $("lerr").textContent = e instanceof TypeError ? errMsg(e) : "Wrong PIN"; }
 };
 
 async function api(path, opt = {}, table = "entries") {
@@ -179,11 +215,31 @@ async function api(path, opt = {}, table = "entries") {
   return r.status === 204 ? null : r.text().then(t => t && JSON.parse(t));
 }
 
-// --- form setup
+// --- offline queue: new entries made without internet wait on the phone, then sync
+// ponytail: if a POST succeeds but the reply is lost, the retry makes a duplicate; delete it by hand.
+const Q = () => { try { return JSON.parse(localStorage.gq) || []; } catch (e) { return []; } };
+const setQ = q => {
+  q.length ? localStorage.gq = JSON.stringify(q) : delete localStorage.gq;
+  $("pend").hidden = !q.length; $("pend").textContent = `⏳ ${q.length} ${q.length > 1 ? "entries" : "entry"} waiting for internet to sync`;
+};
+async function flushQ() {
+  for (let q = Q(); q.length; q = Q()) {
+    try { await api("", {method: "POST", headers: {Prefer: "return=minimal"}, body: JSON.stringify(q[0])}); }
+    catch (e) { if (e instanceof TypeError || ["401", "403"].includes(e.message)) return; } // else: bad entry, drop it
+    setQ(q.slice(1));
+  }
+}
+async function addEntry(o) { // true = saved, false = queued offline
+  try { await api("", {method: "POST", headers: {Prefer: "return=minimal"}, body: JSON.stringify(o)}); return true; }
+  catch (e) { if (!(e instanceof TypeError)) throw e; setQ([...Q(), o]); return false; }
+}
+setQ(Q());
+addEventListener("online", () => S && spin(load));
+
+// --- month + form setup
 $("who").replaceChildren(...NAMES.map(n => new Option(n)));
 $("who").value = NAMES[1];
 const today = new Date().toLocaleDateString("sv"); // local date (toISOString is UTC: wrong in IST)
-$("date").value = today;
 $("month").value = today.slice(0, 7);
 $("month").onchange = () => $("month").value && spin(load);
 const shift = n => { // move month by n (Date handles year rollover)
@@ -204,11 +260,19 @@ function drawCats() {
 drawCats();
 $("type").onchange = () => $("cats").hidden = $("type").value === "income";
 
+// date row is hidden: entries default to today, "change date" reveals the picker
+const showDate = on => { $("date").hidden = !on; $("dlink").hidden = on; };
+$("dlink").onclick = e => { e.preventDefault(); showDate(true); $("date").focus(); };
+
 function resetForm() {
-  editId = null; $("go").textContent = "Add"; $("cancel").hidden = true;
-  $("amount").value = ""; $("note").value = ""; $("date").value = today;
+  editId = null; $("go").textContent = "Add"; $("stitle").textContent = "Add entry";
+  $("amount").value = ""; $("note").value = ""; $("date").value = today; showDate(false);
 }
-$("cancel").onclick = resetForm;
+function openSheet() { $("ov").hidden = false; $("sheet").classList.add("open"); $("amount").focus(); } // amount focused: keypad opens at once
+function closeSheet() { $("sheet").classList.remove("open"); $("ov").hidden = true; resetForm(); document.activeElement.blur(); }
+$("fab").onclick = () => { resetForm(); openSheet(); };
+$("sclose").onclick = $("ov").onclick = closeSheet;
+addEventListener("keydown", e => e.key === "Escape" && closeSheet());
 
 function startEdit(r) {
   editId = r.id;
@@ -216,33 +280,47 @@ function startEdit(r) {
   $("date").value = r.date; $("type").value = r.type; $("amount").value = r.amount;
   $("who").value = r.who; $("note").value = r.note || "";
   if (r.category) { cat = r.category; drawCats(); }
-  $("cats").hidden = r.type === "income";
-  $("go").textContent = "Save changes"; $("cancel").hidden = false;
-  scrollTo(0, 0);
+  $("cats").hidden = r.type === "income"; showDate(r.date !== today);
+  $("go").textContent = "Save changes"; $("stitle").textContent = "Edit entry";
+  openSheet();
 }
 
 $("f").onsubmit = async e => {
   e.preventDefault();
-  const body = JSON.stringify({date: $("date").value, type: $("type").value, amount: +$("amount").value,
-    who: $("who").value, note: $("note").value.trim(), category: $("type").value === "expense" ? cat : null});
+  const o = {date: $("date").value, type: $("type").value, amount: +$("amount").value,
+    who: $("who").value, note: $("note").value.trim(), category: $("type").value === "expense" ? cat : null};
   try {
     await spin(async () => {
-      await (editId ? api("?id=eq." + editId, {method: "PATCH", headers: {Prefer: "return=minimal"}, body})
-                    : api("", {method: "POST", headers: {Prefer: "return=minimal"}, body}));
-      resetForm(); await load();
+      let ok = true;
+      if (editId) { await api("?id=eq." + editId, {method: "PATCH", headers: {Prefer: "return=minimal"}, body: JSON.stringify(o)}); closeSheet(); }
+      else { ok = await addEntry(o); $("amount").value = ""; $("note").value = ""; $("amount").focus(); } // stay open: add several in a row
+      buzz(); toast(ok ? (editId ? "Saved ✓" : "Saved ✓  add another, or close") : "Saved offline, will sync");
+      if (ok) await load();
     });
-  } catch (e) { $("err").textContent = "Save failed: " + e.message + " (did you run the category SQL?)"; }
+  } catch (e) { toast(errMsg(e)); }
 };
+
+// --- delete (button or swipe left) with undo
+async function del(r) {
+  try {
+    await spin(async () => { await api("?id=eq." + r.id, {method: "DELETE"}); await load(); });
+    buzz();
+    toast(`Deleted ₹${fmt(r.amount)} ${r.note || r.category || ""}`,
+      () => addEntry({date: r.date, type: r.type, amount: r.amount, who: r.who, note: r.note, category: r.category}));
+  } catch (e) { toast(errMsg(e)); }
+}
 
 // --- load + render
 async function load() {
   try {
+    await flushQ();
     const m = $("month").value, [y, mo] = m.split("-").map(Number);
     const start = m + "-01", next = mo === 12 ? `${y + 1}-01-01` : `${y}-${String(mo + 1).padStart(2, "0")}-01`;
     rows = await api(`?select=*&date=gte.${start}&date=lt.${next}&order=date.desc,id.desc`);
     // leftover from all earlier months, summed in the DB (carry_before function): no row cap
     const carry = +await api("/carry_before", {method: "POST", body: JSON.stringify({d: start})}, "rpc");
     budgets = Object.fromEntries((await api("?select=*", {}, "budgets")).map(x => [x.category, +x.amount]));
+    const recent = await api("?select=amount,note,category&type=eq.expense&order=id.desc&limit=200");
 
     let inc = 0, exp = 0; const by = {}, who = {};
     for (const r of rows) {
@@ -260,12 +338,32 @@ async function load() {
     const dayNo = cur ? +today.slice(8) : days, left = days - dayNo + 1;
     $("pace").textContent = `Spending ₹${fmt(Math.round(exp / dayNo))}/day` +
       (cur && bal > 0 ? ` · ₹${fmt(Math.floor(bal / left))}/day for ${left} days left` : "");
-    drawBrk(by); render();
+    drawBrk(by); drawQuick(recent); render();
     $("err").textContent = "";
   } catch (e) {
     if (["400", "401", "403"].includes(e.message)) return logout(); // expired session / failed refresh
-    $("err").textContent = "Load failed: " + e.message;
+    $("err").textContent = errMsg(e);
   }
+}
+
+// quick-add: your most repeated expenses (same note/category + amount, seen 2+ times), one tap saves for today
+function drawQuick(recent) {
+  const n = {};
+  for (const r of recent) { const k = [r.note || "", r.category || "Other", +r.amount].join("|"); n[k] = (n[k] || 0) + 1; }
+  const top = Object.entries(n).filter(([, c]) => c > 1).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k]) => k.split("|"));
+  $("quick").hidden = !top.length;
+  $("quick").replaceChildren(...top.map(([note, category, amount]) => {
+    const b = document.createElement("button");
+    b.className = "chip"; b.textContent = `${note || category} ₹${fmt(amount)}`;
+    b.onclick = async () => {
+      try {
+        const ok = await spin(() => addEntry({date: today, type: "expense", amount: +amount, who: $("who").value, note, category}));
+        buzz(); toast(ok ? `Saved ✓ ${b.textContent}` : "Saved offline, will sync");
+        if (ok) spin(load);
+      } catch (e) { toast(errMsg(e)); }
+    };
+    return b;
+  }));
 }
 
 // category bars; bar = spent vs budget (red when over), or vs biggest category if no budget. Tap a row to filter.
@@ -288,12 +386,12 @@ const dayLabel = d => d === today ? "Today" : d === new Date(Date.now() - 864e5)
   : new Date(d + "T00:00").toLocaleDateString("en-IN", {weekday: "short", day: "numeric", month: "short"});
 
 function render() { // list only: filters apply here, month totals above stay for the whole month
-  const q = $("q").value.trim().toLowerCase(), fw = $("fwho").value, fc = $("fcat").value;
+  const q = $("q").value.trim().toLowerCase(), fw = $("fwho").value, fc = $("fcat").value, filtered = q || fw || fc;
   const shown = rows.filter(r => (!fw || r.who === fw) && (!fc || (r.type === "expense" && (r.category || "Other") === fc)) &&
     (!q || [r.note, r.category, r.who, r.amount].join(" ").toLowerCase().includes(q)));
   const dayExp = {}; let e = 0, i = 0;
   for (const r of shown) r.type === "expense" ? (e += +r.amount, dayExp[r.date] = (dayExp[r.date] || 0) + +r.amount) : i += +r.amount;
-  $("fsum").textContent = q || fw || fc ? `${shown.length} shown · spent ₹${fmt(e)}` + (i ? ` · income ₹${fmt(i)}` : "") : "";
+  $("fsum").textContent = filtered ? `${shown.length} shown · spent ₹${fmt(e)}` + (i ? ` · income ₹${fmt(i)}` : "") : "";
 
   const out = []; let last;
   for (const r of shown) {
@@ -309,17 +407,35 @@ function render() { // list only: filters apply here, month totals above stay fo
     s.textContent = [r.who, !inc && r.note && r.category].filter(Boolean).join(" · ");
     d.append(s);
     const b = document.createElement("button");
-    b.className = "del"; b.textContent = "✕"; b.setAttribute("aria-label", "Delete");
-    b.onclick = async () => {
-      await spin(async () => { await api("?id=eq." + r.id, {method: "DELETE"}); await load(); });
-      toast(`Deleted ₹${fmt(r.amount)}${r.note || r.category || ""}`, () => api("", {method: "POST", headers: {Prefer: "return=minimal"},
-        body: JSON.stringify({date: r.date, type: r.type, amount: r.amount, who: r.who, note: r.note, category: r.category})}));
-    };
+    b.className = "del"; b.textContent = "✕"; b.setAttribute("aria-label", "Delete"); b.onclick = () => del(r);
     li.append(d, b); out.push(li);
+
+    // swipe left past 100px to delete
+    let x0 = null, y0 = 0, dx = 0;
+    const move = x => { for (const el of [d, b]) { el.style.transition = x ? "none" : ""; el.style.transform = x ? `translateX(${x}px)` : ""; } };
+    li.addEventListener("touchstart", ev => { x0 = ev.touches[0].clientX; y0 = ev.touches[0].clientY; dx = 0; }, {passive: true});
+    li.addEventListener("touchmove", ev => {
+      if (x0 === null) return;
+      dx = ev.touches[0].clientX - x0;
+      if (dx < -10 && Math.abs(dx) > Math.abs(ev.touches[0].clientY - y0)) { li.classList.add("swiping"); move(dx); }
+    }, {passive: true});
+    const end = go => { move(0); li.classList.remove("swiping"); const hit = go && dx < -100; x0 = null; dx = 0; if (hit) del(r); };
+    li.addEventListener("touchend", () => end(true));
+    li.addEventListener("touchcancel", () => end(false));
   }
-  if (!shown.length) { const li = document.createElement("li"); li.className = "empty"; li.textContent = "No entries"; out.push(li); }
+  if (!shown.length) {
+    const li = document.createElement("li"); li.className = "empty";
+    li.textContent = filtered ? "Nothing matches your search." : "No entries this month yet. Tap + to add your first one.";
+    out.push(li);
+  }
   $("list").replaceChildren(...out);
 }
+
+// pull down at the top of the page to refresh
+let py = null;
+addEventListener("touchstart", e => { py = scrollY === 0 && S && !$("sheet").classList.contains("open") ? e.touches[0].clientY : null; }, {passive: true});
+addEventListener("touchend", e => { if (py !== null && e.changedTouches[0].clientY - py > 90) spin(load); py = null; }, {passive: true});
+
 // budget editor: inputs are built fresh on open so the 30s refresh never wipes what you're typing
 $("bd").ontoggle = () => {
   if (!$("bd").open) return;
@@ -337,8 +453,8 @@ $("bsave").onclick = () => spin(async () => {
   try {
     if (set.length) await api("", {method: "POST", headers: {Prefer: "resolution=merge-duplicates,return=minimal"}, body: JSON.stringify(set)}, "budgets");
     if (clear.length) await api(`?category=in.(${clear.join(",")})`, {method: "DELETE"}, "budgets");
-    $("bd").open = false; await load();
-  } catch (e) { $("err").textContent = "Could not save budgets: " + e.message; }
+    $("bd").open = false; toast("Budgets saved ✓"); await load();
+  } catch (e) { toast(errMsg(e)); }
 });
 $("fwho").replaceChildren(new Option("Everyone", ""), ...NAMES.map(n => new Option(n)));
 $("fcat").replaceChildren(new Option("All categories", ""), ...CATS.map(c => new Option(c)));
