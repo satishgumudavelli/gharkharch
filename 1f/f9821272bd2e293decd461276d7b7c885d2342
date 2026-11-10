@@ -1,0 +1,35 @@
+index.html
+  s_0d23c1d2b14fd3::t_9fcd655132b84b 377-378,383
+  s_0d23c1d2b14fd3::t_690e042d403ca9 389,391,394-399
+  s_0d23c1d2b14fd3::t_546ba87dc5b141 119-120,122
+  s_0d23c1d2b14fd3::t_36defc2cdcf894 137-142
+  s_0d23c1d2b14fd3::t_5bb86b0cc1d4d2 128
+  s_0d23c1d2b14fd3::t_12fa6474cc5b48 178,180-181
+  s_0d23c1d2b14fd3::t_1fe77a0aec2295 72
+  s_0d23c1d2b14fd3::t_7f90cae0575233 304-326
+  s_0d23c1d2b14fd3::t_7244e66c6441cb 420-421
+  s_0d23c1d2b14fd3::t_d5806366cc1bc9 449
+  s_0d23c1d2b14fd3::t_0ba5d7dadc4651 165-170
+  s_0d23c1d2b14fd3::t_619a5788962633 428-430
+  s_0d23c1d2b14fd3::t_f6aaf78adc9fb4 79,81-94
+  s_0d23c1d2b14fd3::t_27de831dedbda4 227
+  s_0d23c1d2b14fd3::t_5a590e8054340c 356
+  s_0d23c1d2b14fd3::t_b449aeb37179cf 332-338,343
+  s_0d23c1d2b14fd3::t_523a94d6f44bbc 589-593
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1ff9821272bd2e293decd461276d7b7c885d2342",
+  "prompts": {},
+  "sessions": {
+    "s_0d23c1d2b14fd3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f06bc34-fe40-48a0-9701-7096baf552e4",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "satish.gumudavelli <satish.gumudavelli@kitchen365.com>"
+    }
+  }
+}
